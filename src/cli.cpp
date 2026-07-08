@@ -10,7 +10,13 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+
+#ifdef _WIN32
+#include <chrono>
+#include <thread>
+#else
 #include <sys/select.h>
+#endif
 
 #include "hardware.h"
 
@@ -40,7 +46,11 @@ void printUsage(const char* programName) {
 std::string timestamp() {
     const std::time_t now = std::time(nullptr);
     std::tm local{};
+#ifdef _WIN32
+    localtime_s(&local, &now);
+#else
     localtime_r(&now, &local);
+#endif
 
     std::ostringstream out;
     out << std::put_time(&local, "%Y-%m-%d %H:%M:%S");
@@ -126,21 +136,28 @@ int run(int argc, char** argv) {
     }
 
     std::signal(SIGINT, handleSignal);
+#ifndef _WIN32
     std::signal(SIGTERM, handleSignal);
+#endif
 
-    int serialFd = -1;
+    hardware::NativeSerialHandle serialHandle = hardware::invalidSerialHandle;
     try {
-        serialFd = hardware::openSerialPort(options.device, options.baud);
+        serialHandle = hardware::openSerialPort(options.device, options.baud);
         std::cout << "Listening on " << options.device << " at " << options.baud << " baud. Press Ctrl+C to quit.\n";
 
         std::string serialBuffer;
 
         while (keepRunning) {
+#ifdef _WIN32
+            serialBuffer += hardware::readAvailable(serialHandle);
+            processSerialBuffer(serialBuffer, logFile);
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+#else
             fd_set readSet;
             FD_ZERO(&readSet);
-            FD_SET(serialFd, &readSet);
+            FD_SET(serialHandle, &readSet);
 
-            const int ready = select(serialFd + 1, &readSet, nullptr, nullptr, nullptr);
+            const int ready = select(serialHandle + 1, &readSet, nullptr, nullptr, nullptr);
             if (ready == -1) {
                 if (errno == EINTR) {
                     continue;
@@ -148,16 +165,18 @@ int run(int argc, char** argv) {
                 throw std::runtime_error("select failed: " + std::string(std::strerror(errno)));
             }
 
-            if (FD_ISSET(serialFd, &readSet)) {
-                serialBuffer += hardware::readAvailable(serialFd);
+            if (FD_ISSET(serialHandle, &readSet)) {
+                serialBuffer += hardware::readAvailable(serialHandle);
                 processSerialBuffer(serialBuffer, logFile);
             }
+#endif
         }
 
-        hardware::closeSerialPort(serialFd);
+        hardware::closeSerialPort(serialHandle);
+        serialHandle = hardware::invalidSerialHandle;
     } catch (const std::exception& error) {
-        if (serialFd != -1) {
-            hardware::closeSerialPort(serialFd);
+        if (serialHandle != hardware::invalidSerialHandle) {
+            hardware::closeSerialPort(serialHandle);
         }
         std::cerr << "Error: " << error.what() << '\n';
         return 1;

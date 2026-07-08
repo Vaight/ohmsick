@@ -1,21 +1,80 @@
 #include <cerrno>
 #include <charconv>
 #include <cmath>
-#include <cstring>
-#include <fcntl.h>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
+#include <cstring>
+#include <fcntl.h>
 #include <termios.h>
 #include <unistd.h>
-#include <vector>
+#endif
 
 #include "hardware.h"
 
 namespace {
 
+#ifdef _WIN32
+DWORD baudToSpeed(int baud) {
+    switch (baud) {
+        case 9600:
+        case 19200:
+        case 38400:
+        case 57600:
+        case 115200:
+            return static_cast<DWORD>(baud);
+        default:
+            throw std::runtime_error("Unsupported baud rate. Try 9600, 19200, 38400, 57600, or 115200.");
+    }
+}
+
+std::string windowsErrorMessage(const std::string& prefix) {
+    const DWORD error = GetLastError();
+    LPSTR message = nullptr;
+    const DWORD length = FormatMessageA(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+        nullptr,
+        error,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        reinterpret_cast<LPSTR>(&message),
+        0,
+        nullptr);
+
+    std::string result = prefix + ": ";
+    if (length != 0 && message != nullptr) {
+        result.append(message, length);
+        while (!result.empty() && (result.back() == '\n' || result.back() == '\r')) {
+            result.pop_back();
+        }
+    } else {
+        result += "Windows error " + std::to_string(error);
+    }
+
+    if (message != nullptr) {
+        LocalFree(message);
+    }
+
+    return result;
+}
+
+std::string normalizeWindowsDeviceName(const std::string& device) {
+    if (device.rfind("\\\\.\\", 0) == 0) {
+        return device;
+    }
+
+    return "\\\\.\\" + device;
+}
+#else
 speed_t baudToSpeed(int baud) {
     switch (baud) {
         case 9600: return B9600;
@@ -27,6 +86,7 @@ speed_t baudToSpeed(int baud) {
             throw std::runtime_error("Unsupported baud rate. Try 9600, 19200, 38400, 57600, or 115200.");
     }
 }
+#endif
 
 bool parseInt(std::string_view text, int& value) {
     if (text.empty()) {
@@ -65,15 +125,15 @@ SerialReader::~SerialReader() {
     close();
 }
 
-SerialReader::SerialReader(SerialReader&& other) noexcept : fd_(other.fd_) {
-    other.fd_ = -1;
+SerialReader::SerialReader(SerialReader&& other) noexcept : handle_(other.handle_) {
+    other.handle_ = invalidSerialHandle;
 }
 
 SerialReader& SerialReader::operator=(SerialReader&& other) noexcept {
     if (this != &other) {
         close();
-        fd_ = other.fd_;
-        other.fd_ = -1;
+        handle_ = other.handle_;
+        other.handle_ = invalidSerialHandle;
     }
 
     return *this;
@@ -81,33 +141,81 @@ SerialReader& SerialReader::operator=(SerialReader&& other) noexcept {
 
 void SerialReader::open(const std::string& device, int baud) {
     close();
-    fd_ = openSerialPort(device, baud);
+    handle_ = openSerialPort(device, baud);
 }
 
 void SerialReader::close() {
-    if (fd_ != -1) {
-        closeSerialPort(fd_);
-        fd_ = -1;
+    if (handle_ != invalidSerialHandle) {
+        closeSerialPort(handle_);
+        handle_ = invalidSerialHandle;
     }
 }
 
 bool SerialReader::isOpen() const {
-    return fd_ != -1;
+    return handle_ != invalidSerialHandle;
 }
 
-int SerialReader::nativeHandle() const {
-    return fd_;
+NativeSerialHandle SerialReader::nativeHandle() const {
+    return handle_;
 }
 
 std::string SerialReader::readAvailable() const {
-    if (fd_ == -1) {
+    if (handle_ == invalidSerialHandle) {
         return {};
     }
 
-    return hardware::readAvailable(fd_);
+    return hardware::readAvailable(handle_);
 }
 
-int openSerialPort(const std::string& device, int baud) {
+NativeSerialHandle openSerialPort(const std::string& device, int baud) {
+#ifdef _WIN32
+    const std::string normalizedDevice = normalizeWindowsDeviceName(device);
+    HANDLE handle = CreateFileA(
+        normalizedDevice.c_str(),
+        GENERIC_READ,
+        0,
+        nullptr,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr);
+
+    if (handle == INVALID_HANDLE_VALUE) {
+        throw std::runtime_error(windowsErrorMessage("Could not open " + device));
+    }
+
+    DCB dcb {};
+    dcb.DCBlength = sizeof(dcb);
+    if (!GetCommState(handle, &dcb)) {
+        CloseHandle(handle);
+        throw std::runtime_error(windowsErrorMessage("Could not read serial settings"));
+    }
+
+    dcb.BaudRate = baudToSpeed(baud);
+    dcb.ByteSize = 8;
+    dcb.Parity = NOPARITY;
+    dcb.StopBits = ONESTOPBIT;
+    dcb.fBinary = TRUE;
+    dcb.fDtrControl = DTR_CONTROL_ENABLE;
+    dcb.fRtsControl = RTS_CONTROL_ENABLE;
+
+    if (!SetCommState(handle, &dcb)) {
+        CloseHandle(handle);
+        throw std::runtime_error(windowsErrorMessage("Could not apply serial settings"));
+    }
+
+    COMMTIMEOUTS timeouts {};
+    timeouts.ReadIntervalTimeout = MAXDWORD;
+    timeouts.ReadTotalTimeoutMultiplier = 0;
+    timeouts.ReadTotalTimeoutConstant = 0;
+
+    if (!SetCommTimeouts(handle, &timeouts)) {
+        CloseHandle(handle);
+        throw std::runtime_error(windowsErrorMessage("Could not apply serial timeouts"));
+    }
+
+    PurgeComm(handle, PURGE_RXCLEAR | PURGE_TXCLEAR);
+    return handle;
+#else
     const int fd = open(device.c_str(), O_RDONLY | O_NOCTTY | O_NONBLOCK);
     if (fd == -1) {
         throw std::runtime_error("Could not open " + device + ": " + std::strerror(errno));
@@ -140,11 +248,25 @@ int openSerialPort(const std::string& device, int baud) {
 
     tcflush(fd, TCIOFLUSH);
     return fd;
+#endif
 }
 
-std::string readAvailable(int serialFd) {
+std::string readAvailable(NativeSerialHandle serialHandle) {
+#ifdef _WIN32
     char buffer[256];
-    const ssize_t count = read(serialFd, buffer, sizeof(buffer));
+    DWORD count = 0;
+    if (!ReadFile(serialHandle, buffer, sizeof(buffer), &count, nullptr)) {
+        throw std::runtime_error(windowsErrorMessage("Serial read failed"));
+    }
+
+    if (count > 0) {
+        return std::string(buffer, static_cast<std::size_t>(count));
+    }
+
+    return {};
+#else
+    char buffer[256];
+    const ssize_t count = read(serialHandle, buffer, sizeof(buffer));
     if (count > 0) {
         return std::string(buffer, static_cast<std::size_t>(count));
     }
@@ -154,6 +276,7 @@ std::string readAvailable(int serialFd) {
     }
 
     return {};
+#endif
 }
 
 std::optional<Frame> parseFrame(std::string_view line) {
@@ -230,8 +353,12 @@ ParsedLine parseLine(const std::string& line) {
     return result;
 }
 
-void closeSerialPort(int serialFd) {
-    close(serialFd);
+void closeSerialPort(NativeSerialHandle serialHandle) {
+#ifdef _WIN32
+    CloseHandle(serialHandle);
+#else
+    close(serialHandle);
+#endif
 }
 
 }  // namespace hardware

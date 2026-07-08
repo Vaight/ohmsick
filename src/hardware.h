@@ -7,6 +7,14 @@
 
 namespace hardware {
 
+#ifdef _WIN32
+using NativeSerialHandle = void*;
+constexpr NativeSerialHandle invalidSerialHandle = nullptr;
+#else
+using NativeSerialHandle = int;
+constexpr NativeSerialHandle invalidSerialHandle = -1;
+#endif
+
 constexpr int maxInputSlots = 64;
 
 enum class Kind {
@@ -46,18 +54,18 @@ public:
     void open(const std::string& device, int baud);
     void close();
     bool isOpen() const;
-    int nativeHandle() const;
+    NativeSerialHandle nativeHandle() const;
     std::string readAvailable() const;
 
 private:
-    int fd_ = -1;
+    NativeSerialHandle handle_ = invalidSerialHandle;
 };
 
-int openSerialPort(const std::string& device, int baud);
-std::string readAvailable(int serialFd);
+NativeSerialHandle openSerialPort(const std::string& device, int baud);
+std::string readAvailable(NativeSerialHandle serialHandle);
 std::optional<Frame> parseFrame(std::string_view line);
 std::string formatFrame(const Frame& frame);
 ParsedLine parseLine(const std::string& line);
-void closeSerialPort(int serialFd);
+void closeSerialPort(NativeSerialHandle serialHandle);
 
 }  // namespace hardware

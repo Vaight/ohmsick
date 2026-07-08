@@ -19,6 +19,12 @@ juce::String inputParameterName(int slot) {
 }
 
 juce::File configFilePath() {
+    if (const char* appData = std::getenv("APPDATA")) {
+        if (*appData != '\0') {
+            return juce::File(juce::String(appData)).getChildFile("vst3arduinothing/config.json");
+        }
+    }
+
     if (const char* xdgConfig = std::getenv("XDG_CONFIG_HOME")) {
         if (*xdgConfig != '\0') {
             return juce::File(juce::String(xdgConfig)).getChildFile("vst3arduinothing/config.json");
