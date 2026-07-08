@@ -5,14 +5,12 @@
 #include <deque>
 #include <mutex>
 #include <thread>
-#include <vector>
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include "hardware.h"
 
-class HardwareControlAudioProcessor final : public juce::AudioProcessor,
-                                            private juce::Timer {
+class HardwareControlAudioProcessor final : public juce::AudioProcessor {
 public:
     HardwareControlAudioProcessor();
     ~HardwareControlAudioProcessor() override;
@@ -60,7 +58,6 @@ private:
     void stopSerialThread();
     void serialThreadMain(SerialConfig config);
     void pushSerialLogLine(const juce::String& line);
-    void timerCallback() override;
 
     SerialConfig serialConfig_;
     mutable std::mutex serialConfigMutex_;
@@ -72,8 +69,9 @@ private:
 
     std::array<std::atomic<float>, hardware::maxInputSlots> targetValues_ {};
     std::array<std::atomic<int>, hardware::maxInputSlots> targetKinds_ {};
-    std::array<float, hardware::maxInputSlots> lastNotifiedValues_ {};
-    std::vector<juce::AudioParameterFloat*> inputParameters_;
+    std::array<std::atomic<bool>, hardware::maxInputSlots> targetHasValue_ {};
+    std::array<std::atomic<int>, hardware::maxInputSlots> lastSentCcValues_ {};
+    std::array<std::atomic<bool>, hardware::maxInputSlots> hasSentCcValues_ {};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(HardwareControlAudioProcessor)
 };

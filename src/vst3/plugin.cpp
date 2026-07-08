@@ -9,15 +9,8 @@
 namespace {
 
 constexpr float potSmoothingAlpha = 0.25f;
-constexpr float potNotifyThreshold = 0.005f;
-
-juce::String inputParameterId(int slot) {
-    return "input" + juce::String(slot + 1).paddedLeft('0', 2);
-}
-
-juce::String inputParameterName(int slot) {
-    return "Input " + juce::String(slot + 1).paddedLeft('0', 2);
-}
+constexpr int midiChannel = 1;
+constexpr int firstMidiCc = 1;
 
 juce::File configFilePath() {
     if (const char* appData = std::getenv("APPDATA")) {
@@ -166,32 +159,20 @@ private:
 
 HardwareControlAudioProcessor::HardwareControlAudioProcessor()
     : AudioProcessor(BusesProperties()
-        .withInput("Input", juce::AudioChannelSet::stereo(), true)
         .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       serialConfig_(loadSerialConfig()) {
-    inputParameters_.reserve(hardware::maxInputSlots);
-
     for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
         targetValues_[slot].store(0.0f);
         targetKinds_[slot].store(static_cast<int>(hardware::Kind::Pot));
-        lastNotifiedValues_[slot] = 0.0f;
-
-        auto* parameter = new juce::AudioParameterFloat(
-            juce::ParameterID(inputParameterId(slot), 1),
-            inputParameterName(slot),
-            juce::NormalisableRange<float>(0.0f, 1.0f),
-            0.0f);
-
-        addParameter(parameter);
-        inputParameters_.push_back(parameter);
+        targetHasValue_[slot].store(false);
+        lastSentCcValues_[slot].store(-1);
+        hasSentCcValues_[slot].store(false);
     }
 
-    startTimerHz(30);
     startSerialThread();
 }
 
 HardwareControlAudioProcessor::~HardwareControlAudioProcessor() {
-    stopTimer();
     stopSerialThread();
 }
 
@@ -200,11 +181,11 @@ const juce::String HardwareControlAudioProcessor::getName() const {
 }
 
 bool HardwareControlAudioProcessor::acceptsMidi() const {
-    return false;
+    return true;
 }
 
 bool HardwareControlAudioProcessor::producesMidi() const {
-    return false;
+    return true;
 }
 
 bool HardwareControlAudioProcessor::isMidiEffect() const {
@@ -240,23 +221,32 @@ void HardwareControlAudioProcessor::releaseResources() {
 }
 
 bool HardwareControlAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
-    const auto& mainOutput = layouts.getMainOutputChannelSet();
-    const auto& mainInput = layouts.getMainInputChannelSet();
-
-    if (mainOutput != juce::AudioChannelSet::mono()
-        && mainOutput != juce::AudioChannelSet::stereo()) {
-        return false;
-    }
-
-    return mainInput == mainOutput;
+    return layouts.getMainInputChannelSet().isDisabled()
+        && (layouts.getMainOutputChannelSet() == juce::AudioChannelSet::mono()
+            || layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo());
 }
 
 void HardwareControlAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
     midiMessages.clear();
+    buffer.clear();
 
-    for (int channel = getTotalNumInputChannels(); channel < getTotalNumOutputChannels(); ++channel) {
-        buffer.clear(channel, 0, buffer.getNumSamples());
+    for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
+        if (!targetHasValue_[slot].load()) {
+            continue;
+        }
+
+        const auto kind = static_cast<hardware::Kind>(targetKinds_[slot].load());
+        const float normalizedValue = clamp01(targetValues_[slot].load());
+        const int ccValue = kind == hardware::Kind::Button
+            ? (normalizedValue >= 0.5f ? 127 : 0)
+            : juce::roundToInt(normalizedValue * 127.0f);
+
+        if (!hasSentCcValues_[slot].load() || ccValue != lastSentCcValues_[slot].load()) {
+            midiMessages.addEvent(juce::MidiMessage::controllerEvent(midiChannel, firstMidiCc + slot, ccValue), 0);
+            lastSentCcValues_[slot].store(ccValue);
+            hasSentCcValues_[slot].store(true);
+        }
     }
 }
 
@@ -347,6 +337,12 @@ void HardwareControlAudioProcessor::connectSerial(juce::String device, int baud)
     setSerialConfig(config);
 
     if (config.enabled) {
+        for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
+            targetHasValue_[slot].store(false);
+            lastSentCcValues_[slot].store(-1);
+            hasSentCcValues_[slot].store(false);
+        }
+
         pushSerialLogLine("Connecting to " + config.device + " at " + juce::String(config.baud));
         startSerialThread();
     }
@@ -431,6 +427,7 @@ void HardwareControlAudioProcessor::serialThreadMain(SerialConfig config) {
 
                 std::array<float, hardware::maxInputSlots> nextValues {};
                 std::array<int, hardware::maxInputSlots> nextKinds {};
+                std::array<bool, hardware::maxInputSlots> touchedSlots {};
                 nextKinds.fill(static_cast<int>(hardware::Kind::Pot));
 
                 for (const auto& reading : frame->readings) {
@@ -449,11 +446,17 @@ void HardwareControlAudioProcessor::serialThreadMain(SerialConfig config) {
                     }
 
                     nextKinds[reading.slot] = static_cast<int>(kind);
+                    touchedSlots[reading.slot] = true;
                 }
 
                 for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
+                    if (!touchedSlots[slot]) {
+                        continue;
+                    }
+
                     targetValues_[slot].store(nextValues[slot]);
                     targetKinds_[slot].store(nextKinds[slot]);
+                    targetHasValue_[slot].store(true);
                 }
             }
 
@@ -476,23 +479,6 @@ void HardwareControlAudioProcessor::pushSerialLogLine(const juce::String& line) 
 
     while (serialLogLines_.size() > 200) {
         serialLogLines_.pop_front();
-    }
-}
-
-void HardwareControlAudioProcessor::timerCallback() {
-    for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
-        const float value = clamp01(targetValues_[slot].load());
-        const auto kind = static_cast<hardware::Kind>(targetKinds_[slot].load());
-        const float previous = lastNotifiedValues_[slot];
-
-        const bool shouldNotify = kind == hardware::Kind::Button
-            ? ((value >= 0.5f) != (previous >= 0.5f))
-            : std::abs(value - previous) >= potNotifyThreshold;
-
-        if (shouldNotify) {
-            inputParameters_[slot]->setValueNotifyingHost(value);
-            lastNotifiedValues_[slot] = value;
-        }
     }
 }
 
