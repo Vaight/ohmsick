@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <iomanip>
 #include <sstream>
 #include <utility>
 
@@ -38,6 +39,14 @@ float clamp01(float value) {
     return juce::jlimit(0.0f, 1.0f, value);
 }
 
+int normalizedToMidiValue(float value) {
+    return juce::jlimit(0, 127, juce::roundToInt(clamp01(value) * 127.0f));
+}
+
+juce::String kindName(hardware::Kind kind) {
+    return kind == hardware::Kind::Button ? "Button" : "Pot";
+}
+
 }  // namespace
 
 class HardwareControlAudioProcessorEditor final : public juce::AudioProcessorEditor,
@@ -45,7 +54,7 @@ class HardwareControlAudioProcessorEditor final : public juce::AudioProcessorEdi
 public:
     explicit HardwareControlAudioProcessorEditor(HardwareControlAudioProcessor& processor)
         : AudioProcessorEditor(processor), processor_(processor) {
-        setSize(420, 260);
+        setSize(620, 520);
 
         deviceLabel_.setText("Device", juce::dontSendNotification);
         deviceLabel_.attachToComponent(&deviceEditor_, true);
@@ -66,11 +75,22 @@ public:
         connectButton_.onClick = [this] { toggleConnection(); };
         addAndMakeVisible(connectButton_);
 
-        dataView_.setMultiLine(true);
-        dataView_.setReadOnly(true);
-        dataView_.setScrollbarsShown(true);
-        dataView_.setCaretVisible(false);
-        addAndMakeVisible(dataView_);
+        statusLabel_.setJustificationType(juce::Justification::centredLeft);
+        addAndMakeVisible(statusLabel_);
+
+        inputView_.setMultiLine(true);
+        inputView_.setReadOnly(true);
+        inputView_.setScrollbarsShown(true);
+        inputView_.setCaretVisible(false);
+        inputView_.setFont(juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 13.0f, juce::Font::plain)));
+        addAndMakeVisible(inputView_);
+
+        logView_.setMultiLine(true);
+        logView_.setReadOnly(true);
+        logView_.setScrollbarsShown(true);
+        logView_.setCaretVisible(false);
+        logView_.setFont(juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 12.0f, juce::Font::plain)));
+        addAndMakeVisible(logView_);
 
         const auto config = processor_.getSerialConfig();
         deviceEditor_.setText(config.device, juce::dontSendNotification);
@@ -98,10 +118,16 @@ public:
         baudBox_.setBounds(top.removeFromLeft(90));
 
         bounds.removeFromTop(8);
-        connectButton_.setBounds(bounds.removeFromTop(28).removeFromLeft(100));
+        auto statusRow = bounds.removeFromTop(28);
+        connectButton_.setBounds(statusRow.removeFromLeft(100));
+        statusRow.removeFromLeft(10);
+        statusLabel_.setBounds(statusRow);
 
         bounds.removeFromTop(8);
-        dataView_.setBounds(bounds);
+        inputView_.setBounds(bounds.removeFromTop(330));
+
+        bounds.removeFromTop(8);
+        logView_.setBounds(bounds);
     }
 
 private:
@@ -121,6 +147,19 @@ private:
     void updateConnectionState() {
         const bool connected = processor_.isSerialConnected();
         connectButton_.setButtonText(connected ? "Disconnect" : "Connect");
+
+        const auto config = processor_.getSerialConfig();
+        const int activeCount = countActiveInputs();
+        statusLabel_.setText(
+            (connected ? "Connected" : "Not connected")
+                + juce::String(" | Mode: MIDI CC instrument | Ch ")
+                + juce::String(midiChannel)
+                + " | CC " + juce::String(firstMidiCc) + "-"
+                + juce::String(firstMidiCc + hardware::maxInputSlots - 1)
+                + " | Active " + juce::String(activeCount) + "/"
+                + juce::String(hardware::maxInputSlots)
+                + (config.device.isNotEmpty() ? " | " + config.device : ""),
+            juce::dontSendNotification);
     }
 
     void timerCallback() override {
@@ -136,12 +175,49 @@ private:
         }
 
         if (logChanged || logLines_.size() != lastRenderedLineCount_) {
-            dataView_.setText(logLines_.joinIntoString("\n"), false);
-            dataView_.moveCaretToEnd();
+            logView_.setText(logLines_.joinIntoString("\n"), false);
+            logView_.moveCaretToEnd();
             lastRenderedLineCount_ = logLines_.size();
         }
 
+        renderInputTable();
         updateConnectionState();
+    }
+
+    int countActiveInputs() const {
+        int count = 0;
+        for (const auto& input : processor_.getInputSnapshots()) {
+            if (input.active) {
+                ++count;
+            }
+        }
+
+        return count;
+    }
+
+    void renderInputTable() {
+        const auto inputs = processor_.getInputSnapshots();
+        std::ostringstream out;
+        out << "Input Active Type   Ch  CC  MIDI  Value\n";
+        out << "----- ------ ------ --- --- ----- -------\n";
+
+        for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
+            const auto& input = inputs[static_cast<size_t>(slot)];
+            out << std::setw(5) << (slot + 1) << ' '
+                << std::setw(6) << (input.active ? "yes" : "no") << ' '
+                << std::setw(6) << kindName(input.kind).toStdString() << ' '
+                << std::setw(3) << input.midiChannel << ' '
+                << std::setw(3) << input.midiCc << ' '
+                << std::setw(5) << input.midiValue << ' '
+                << std::fixed << std::setprecision(3)
+                << std::setw(7) << input.normalizedValue << '\n';
+        }
+
+        const juce::String nextText(out.str());
+        if (nextText != lastInputTableText_) {
+            inputView_.setText(nextText, false);
+            lastInputTableText_ = nextText;
+        }
     }
 
     static constexpr int maxVisibleLines = 120;
@@ -152,8 +228,11 @@ private:
     juce::Label baudLabel_;
     juce::ComboBox baudBox_;
     juce::TextButton connectButton_;
-    juce::TextEditor dataView_;
+    juce::Label statusLabel_;
+    juce::TextEditor inputView_;
+    juce::TextEditor logView_;
     juce::StringArray logLines_;
+    juce::String lastInputTableText_;
     int lastRenderedLineCount_ = -1;
 };
 
@@ -221,14 +300,15 @@ void HardwareControlAudioProcessor::releaseResources() {
 }
 
 bool HardwareControlAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
+    const auto& mainOutput = layouts.getMainOutputChannelSet();
+
     return layouts.getMainInputChannelSet().isDisabled()
-        && (layouts.getMainOutputChannelSet() == juce::AudioChannelSet::mono()
-            || layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo());
+        && (mainOutput == juce::AudioChannelSet::mono()
+            || mainOutput == juce::AudioChannelSet::stereo());
 }
 
 void HardwareControlAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
-    midiMessages.clear();
     buffer.clear();
 
     for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
@@ -237,14 +317,16 @@ void HardwareControlAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
         }
 
         const auto kind = static_cast<hardware::Kind>(targetKinds_[slot].load());
-        const float normalizedValue = clamp01(targetValues_[slot].load());
-        const int ccValue = kind == hardware::Kind::Button
-            ? (normalizedValue >= 0.5f ? 127 : 0)
-            : juce::roundToInt(normalizedValue * 127.0f);
+        const float value = clamp01(targetValues_[slot].load());
+        const int midiValue = kind == hardware::Kind::Button
+            ? (value >= 0.5f ? 127 : 0)
+            : normalizedToMidiValue(value);
 
-        if (!hasSentCcValues_[slot].load() || ccValue != lastSentCcValues_[slot].load()) {
-            midiMessages.addEvent(juce::MidiMessage::controllerEvent(midiChannel, firstMidiCc + slot, ccValue), 0);
-            lastSentCcValues_[slot].store(ccValue);
+        if (!hasSentCcValues_[slot].load() || midiValue != lastSentCcValues_[slot].load()) {
+            midiMessages.addEvent(
+                juce::MidiMessage::controllerEvent(midiChannel, firstMidiCc + slot, midiValue),
+                0);
+            lastSentCcValues_[slot].store(midiValue);
             hasSentCcValues_[slot].store(true);
         }
     }
@@ -373,6 +455,25 @@ juce::StringArray HardwareControlAudioProcessor::drainSerialLogLines() {
 
     serialLogLines_.clear();
     return lines;
+}
+
+std::array<HardwareControlAudioProcessor::InputSnapshot, hardware::maxInputSlots>
+HardwareControlAudioProcessor::getInputSnapshots() const {
+    std::array<InputSnapshot, hardware::maxInputSlots> snapshots {};
+
+    for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
+        auto& snapshot = snapshots[static_cast<size_t>(slot)];
+        snapshot.active = targetHasValue_[slot].load();
+        snapshot.kind = static_cast<hardware::Kind>(targetKinds_[slot].load());
+        snapshot.normalizedValue = clamp01(targetValues_[slot].load());
+        snapshot.midiChannel = midiChannel;
+        snapshot.midiCc = firstMidiCc + slot;
+        snapshot.midiValue = snapshot.kind == hardware::Kind::Button
+            ? (snapshot.normalizedValue >= 0.5f ? 127 : 0)
+            : normalizedToMidiValue(snapshot.normalizedValue);
+    }
+
+    return snapshots;
 }
 
 void HardwareControlAudioProcessor::startSerialThread() {

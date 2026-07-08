@@ -51,6 +51,17 @@ public:
     bool isSerialConnected() const;
     juce::StringArray drainSerialLogLines();
 
+    struct InputSnapshot {
+        bool active = false;
+        hardware::Kind kind = hardware::Kind::Pot;
+        float normalizedValue = 0.0f;
+        int midiChannel = 1;
+        int midiCc = 1;
+        int midiValue = 0;
+    };
+
+    std::array<InputSnapshot, hardware::maxInputSlots> getInputSnapshots() const;
+
 private:
     static SerialConfig loadSerialConfig();
 
