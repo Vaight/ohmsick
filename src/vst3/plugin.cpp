@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <sstream>
+#include <utility>
 
 namespace {
 
@@ -45,6 +46,123 @@ float clamp01(float value) {
 }
 
 }  // namespace
+
+class HardwareControlAudioProcessorEditor final : public juce::AudioProcessorEditor,
+                                                  private juce::Timer {
+public:
+    explicit HardwareControlAudioProcessorEditor(HardwareControlAudioProcessor& processor)
+        : AudioProcessorEditor(processor), processor_(processor) {
+        setSize(420, 260);
+
+        deviceLabel_.setText("Device", juce::dontSendNotification);
+        deviceLabel_.attachToComponent(&deviceEditor_, true);
+        addAndMakeVisible(deviceLabel_);
+
+        deviceEditor_.setTextToShowWhenEmpty("COM3 or /dev/ttyACM0", juce::Colours::grey);
+        addAndMakeVisible(deviceEditor_);
+
+        baudLabel_.setText("Baud", juce::dontSendNotification);
+        baudLabel_.attachToComponent(&baudBox_, true);
+        addAndMakeVisible(baudLabel_);
+
+        for (int baud : { 9600, 19200, 38400, 57600, 115200 }) {
+            baudBox_.addItem(juce::String(baud), baud);
+        }
+        addAndMakeVisible(baudBox_);
+
+        connectButton_.onClick = [this] { toggleConnection(); };
+        addAndMakeVisible(connectButton_);
+
+        dataView_.setMultiLine(true);
+        dataView_.setReadOnly(true);
+        dataView_.setScrollbarsShown(true);
+        dataView_.setCaretVisible(false);
+        addAndMakeVisible(dataView_);
+
+        const auto config = processor_.getSerialConfig();
+        deviceEditor_.setText(config.device, juce::dontSendNotification);
+        baudBox_.setText(juce::String(config.baud), juce::dontSendNotification);
+        updateConnectionState();
+        startTimerHz(20);
+    }
+
+    ~HardwareControlAudioProcessorEditor() override {
+        stopTimer();
+    }
+
+    void paint(juce::Graphics& graphics) override {
+        graphics.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
+    }
+
+    void resized() override {
+        auto bounds = getLocalBounds().reduced(16);
+
+        auto top = bounds.removeFromTop(28);
+        top.removeFromLeft(56);
+        deviceEditor_.setBounds(top.removeFromLeft(170));
+
+        top.removeFromLeft(48);
+        baudBox_.setBounds(top.removeFromLeft(90));
+
+        bounds.removeFromTop(8);
+        connectButton_.setBounds(bounds.removeFromTop(28).removeFromLeft(100));
+
+        bounds.removeFromTop(8);
+        dataView_.setBounds(bounds);
+    }
+
+private:
+    void toggleConnection() {
+        if (processor_.isSerialConnected()) {
+            processor_.disconnectSerial();
+        } else {
+            const auto device = deviceEditor_.getText().trim();
+            if (device.isNotEmpty()) {
+                processor_.connectSerial(device, baudBox_.getText().getIntValue());
+            }
+        }
+
+        updateConnectionState();
+    }
+
+    void updateConnectionState() {
+        const bool connected = processor_.isSerialConnected();
+        connectButton_.setButtonText(connected ? "Disconnect" : "Connect");
+    }
+
+    void timerCallback() override {
+        bool logChanged = false;
+        for (const auto& line : processor_.drainSerialLogLines()) {
+            logLines_.add(line);
+            logChanged = true;
+        }
+
+        while (logLines_.size() > maxVisibleLines) {
+            logLines_.remove(0);
+            logChanged = true;
+        }
+
+        if (logChanged || logLines_.size() != lastRenderedLineCount_) {
+            dataView_.setText(logLines_.joinIntoString("\n"), false);
+            dataView_.moveCaretToEnd();
+            lastRenderedLineCount_ = logLines_.size();
+        }
+
+        updateConnectionState();
+    }
+
+    static constexpr int maxVisibleLines = 120;
+
+    HardwareControlAudioProcessor& processor_;
+    juce::Label deviceLabel_;
+    juce::TextEditor deviceEditor_;
+    juce::Label baudLabel_;
+    juce::ComboBox baudBox_;
+    juce::TextButton connectButton_;
+    juce::TextEditor dataView_;
+    juce::StringArray logLines_;
+    int lastRenderedLineCount_ = -1;
+};
 
 HardwareControlAudioProcessor::HardwareControlAudioProcessor()
     : AudioProcessor(BusesProperties()
@@ -143,22 +261,37 @@ void HardwareControlAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
 }
 
 bool HardwareControlAudioProcessor::hasEditor() const {
-    return false;
+    return true;
 }
 
 juce::AudioProcessorEditor* HardwareControlAudioProcessor::createEditor() {
-    return nullptr;
+    return new HardwareControlAudioProcessorEditor(*this);
 }
 
 void HardwareControlAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
+    const auto config = getSerialConfig();
     juce::MemoryOutputStream stream(destData, true);
-    stream.writeString(serialConfig_.device);
-    stream.writeInt(serialConfig_.baud);
-    stream.writeBool(serialConfig_.enabled);
+    stream.writeString(config.device);
+    stream.writeInt(config.baud);
+    stream.writeBool(config.enabled);
 }
 
-void HardwareControlAudioProcessor::setStateInformation(const void*, int) {
-    // Device connection is intentionally controlled by the user config file in v1.
+void HardwareControlAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
+    if (data == nullptr || sizeInBytes <= 0) {
+        return;
+    }
+
+    juce::MemoryInputStream stream(data, static_cast<size_t>(sizeInBytes), false);
+
+    SerialConfig config;
+    config.device = stream.readString();
+    config.baud = stream.readInt();
+    config.enabled = stream.readBool();
+
+    setSerialConfig(config);
+    if (config.enabled) {
+        connectSerial(config.device, config.baud);
+    }
 }
 
 HardwareControlAudioProcessor::SerialConfig HardwareControlAudioProcessor::loadSerialConfig() {
@@ -194,13 +327,66 @@ HardwareControlAudioProcessor::SerialConfig HardwareControlAudioProcessor::loadS
     return config;
 }
 
+HardwareControlAudioProcessor::SerialConfig HardwareControlAudioProcessor::getSerialConfig() const {
+    const std::lock_guard<std::mutex> lock(serialConfigMutex_);
+    return serialConfig_;
+}
+
+void HardwareControlAudioProcessor::setSerialConfig(SerialConfig config) {
+    const std::lock_guard<std::mutex> lock(serialConfigMutex_);
+    serialConfig_ = std::move(config);
+}
+
+void HardwareControlAudioProcessor::connectSerial(juce::String device, int baud) {
+    disconnectSerial();
+
+    SerialConfig config;
+    config.enabled = device.isNotEmpty();
+    config.device = std::move(device);
+    config.baud = baud > 0 ? baud : 19200;
+    setSerialConfig(config);
+
+    if (config.enabled) {
+        pushSerialLogLine("Connecting to " + config.device + " at " + juce::String(config.baud));
+        startSerialThread();
+    }
+}
+
+void HardwareControlAudioProcessor::disconnectSerial() {
+    stopSerialThread();
+
+    auto config = getSerialConfig();
+    if (config.enabled || config.device.isNotEmpty()) {
+        config.enabled = false;
+        setSerialConfig(config);
+        pushSerialLogLine("Disconnected");
+    }
+}
+
+bool HardwareControlAudioProcessor::isSerialConnected() const {
+    return connected_.load();
+}
+
+juce::StringArray HardwareControlAudioProcessor::drainSerialLogLines() {
+    juce::StringArray lines;
+    const std::lock_guard<std::mutex> lock(serialLogMutex_);
+
+    for (const auto& line : serialLogLines_) {
+        lines.add(line);
+    }
+
+    serialLogLines_.clear();
+    return lines;
+}
+
 void HardwareControlAudioProcessor::startSerialThread() {
-    if (!serialConfig_.enabled || serialConfig_.device.isEmpty()) {
+    const auto config = getSerialConfig();
+    if (!config.enabled || config.device.isEmpty()) {
         return;
     }
 
     stopSerialThread_.store(false);
-    serialThread_ = std::thread([this] { serialThreadMain(); });
+    serialThread_ = std::thread([this, config] { serialThreadMain(config); });
 }
 
 void HardwareControlAudioProcessor::stopSerialThread() {
@@ -210,13 +396,16 @@ void HardwareControlAudioProcessor::stopSerialThread() {
         serialThread_.join();
     }
 
-    connected_.store(false);
+    if (connected_.exchange(false)) {
+        pushSerialLogLine("Serial port closed");
+    }
 }
 
-void HardwareControlAudioProcessor::serialThreadMain() {
+void HardwareControlAudioProcessor::serialThreadMain(SerialConfig config) {
     try {
-        hardware::SerialReader reader(serialConfig_.device.toStdString(), serialConfig_.baud);
+        hardware::SerialReader reader(config.device.toStdString(), config.baud);
         connected_.store(true);
+        pushSerialLogLine("Connected to " + config.device);
 
         std::string serialBuffer;
         std::array<float, hardware::maxInputSlots> smoothedValues {};
@@ -231,6 +420,9 @@ void HardwareControlAudioProcessor::serialThreadMain() {
                 if (!line.empty() && line.back() == '\r') {
                     line.pop_back();
                 }
+
+                const auto parsedLine = hardware::parseLine(line);
+                pushSerialLogLine(juce::String(parsedLine.text));
 
                 const auto frame = hardware::parseFrame(line);
                 if (!frame) {
@@ -269,6 +461,21 @@ void HardwareControlAudioProcessor::serialThreadMain() {
         }
     } catch (...) {
         connected_.store(false);
+        auto currentConfig = getSerialConfig();
+        if (currentConfig.device == config.device) {
+            currentConfig.enabled = false;
+            setSerialConfig(currentConfig);
+        }
+        pushSerialLogLine("Serial connection failed");
+    }
+}
+
+void HardwareControlAudioProcessor::pushSerialLogLine(const juce::String& line) {
+    const std::lock_guard<std::mutex> lock(serialLogMutex_);
+    serialLogLines_.push_back(line);
+
+    while (serialLogLines_.size() > 200) {
+        serialLogLines_.pop_front();
     }
 }
 

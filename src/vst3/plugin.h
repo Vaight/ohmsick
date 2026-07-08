@@ -2,6 +2,8 @@
 
 #include <array>
 #include <atomic>
+#include <deque>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -38,24 +40,35 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
-private:
     struct SerialConfig {
         bool enabled = false;
         juce::String device;
         int baud = 19200;
     };
 
+    SerialConfig getSerialConfig() const;
+    void setSerialConfig(SerialConfig config);
+    void connectSerial(juce::String device, int baud);
+    void disconnectSerial();
+    bool isSerialConnected() const;
+    juce::StringArray drainSerialLogLines();
+
+private:
     static SerialConfig loadSerialConfig();
 
     void startSerialThread();
     void stopSerialThread();
-    void serialThreadMain();
+    void serialThreadMain(SerialConfig config);
+    void pushSerialLogLine(const juce::String& line);
     void timerCallback() override;
 
     SerialConfig serialConfig_;
+    mutable std::mutex serialConfigMutex_;
     std::atomic<bool> stopSerialThread_ { false };
     std::atomic<bool> connected_ { false };
     std::thread serialThread_;
+    std::mutex serialLogMutex_;
+    std::deque<juce::String> serialLogLines_;
 
     std::array<std::atomic<float>, hardware::maxInputSlots> targetValues_ {};
     std::array<std::atomic<int>, hardware::maxInputSlots> targetKinds_ {};
