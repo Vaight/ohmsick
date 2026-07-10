@@ -1,25 +1,25 @@
-#include <EEPROM.h>
-
-#define MAX_SIZE 32
-
+#include <EEPROM.h>           // todo - remove EEPROM in favor of vst3 serial assignment & storage
 #define EEPROM_MAGIC 0xCAFE
 #define EEPROM_VERSION 1
 
-int btnPins[MAX_SIZE];
-int potPins[MAX_SIZE];
-int totPins = 0;
-bool inSetupMode = false;
+#define MAX_SIZE 8            // the maximum number of assigned pins per array
+
+int pinsDigital[MAX_SIZE];    // array of assigned digital input pins
+int pinsPullup[MAX_SIZE];     // array of assigned digital pullup resistor input pins
+int pinsAnalog[MAX_SIZE];     // array of assigned analog input pins
+int totalPins = 0;
 
 struct SavedConfig {
   uint16_t magic;
   uint8_t version;
-  int btnPins[MAX_SIZE];
-  int potPins[MAX_SIZE];
+  int pinsDigital[MAX_SIZE];
+  int pinsPullup[MAX_SIZE];
+  int pinsAnalog[MAX_SIZE];
 };
 
+// executes on startup
 void setup() {
   Serial.begin(19200);
-
   loadConfigFromEEPROM();
 
   applyPinModes();
@@ -28,106 +28,54 @@ void setup() {
   Serial.println("READY");
 }
 
+// loops while powered
 void loop() {
+
+  // check if a serial message exists
   if (Serial.available() > 0) {
-    String message = Serial.readStringUntil('\n');
-    message.trim();
-
-    if (message == "setup") {
-      Serial.println("stop-data");
-      Serial.println("YOU ARE NOW IN SETUP MODE. SEND 'help' FOR HELP.");
-      inSetupMode = true;
-    }
-
-    if (inSetupMode) {
-      if (message == "exit") {
-        saveConfigToEEPROM();
-        Serial.println("Configuration saved.");
-        Serial.println("start-data");
-        inSetupMode = false;
-        return;
+    // get serial message as string
+    String msg = Serial.readStringUntil('\n');
+    msg.trim();
+    // the "assignment" command: 'a <pin int> <action int>  
+    if (msg.startsWith("a")) {
+      // split and convert inputs to integers
+      int pin = getValue(msg, ' ', 1).toInt();
+      int action = getValue(msg, ' ', 2).toInt();
+      // cases based on provided action type
+      switch (action) {
+        case 0: removeInput(pin);    // remove pin configuration
+          break;
+        case 1: setInput(pin);       // set pin to digital input
+          break;
+        case 2: setInputPullup(pin); // set pin to digital pullup input
+          break;
+        case 3: setInputAnalog(pin); // set pin to analog input
+          break;
       }
-      else if (message == "help") {
-        Serial.println("HELP MENU:");
-        Serial.println("help - show this menu");
-        Serial.println("exit - close setup mode and save");
-        Serial.println("assign <pin#> <P/B/N> - assign a pin");
-        Serial.println("save - save current assignments");
-        Serial.println("clear - erase all assignments");
-        Serial.println("dump - show all assignments");
-      }
-      else if (message.startsWith("assign")) {
-        String part2 = getValue(message, ' ', 1);
-        String part3 = getValue(message, ' ', 2);
 
-        part3.toUpperCase();
-
-        if (part2 == "" || part3 == "") {
-          Serial.println("assign <pin#> <P/B/N> - assign a pin");
-        } else {
-          int pin = part2.toInt();
-
-          Serial.println("Pin to assign: " + String(pin));
-          Serial.println("Assignment: " + part3);
-
-          if (part3 == "B") {
-            pinMode(pin, INPUT_PULLUP);
-            addBtn(pin);
-            Serial.println("pin assigned to button!");
-          }
-          else if (part3 == "P") {
-            pinMode(pin, INPUT);
-            addPot(pin);
-            Serial.println("pin assigned to potentiometer!");
-          }
-          else if (part3 == "N") {
-            removeBtn(pin);
-            removePot(pin);
-            Serial.println("pin unassigned!");
-          }
-          else {
-            Serial.println("Invalid assignment. Use B, P, or N.");
-          }
-
-          recalculateTotalPins();
-        }
-      }
-      else if (message == "save") {
-        saveConfigToEEPROM();
-        Serial.println("Configuration saved.");
-      }
-      else if (message == "clear") {
-        clearAssignments();
-        saveConfigToEEPROM();
-        Serial.println("Assignments cleared and saved.");
-      }
-      else if (message.startsWith("dump")) {
-        Serial.println("BUTTON PINS:");
-        for (int i = 0; i < MAX_SIZE; i++) {
-          Serial.println("btn" + String(i) + ": " + String(btnPins[i]));
-        }
-
-        Serial.println("POT PINS:");
-        for (int i = 0; i < MAX_SIZE; i++) {
-          Serial.println("pot" + String(i) + ": " + String(potPins[i]));
-        }
-
-        Serial.println("Total assigned pins: " + String(totPins));
-      }
+      recalculateTotalPins();
+      // saveto local config (remove later)
+      saveConfigToEEPROM();
     }
   }
 
-  if (inSetupMode == true) return;
-
+  // string builder variable
   String hardwareData;
-  hardwareData += String(totPins) + " ";
+  hardwareData += String(totalPins) + " ";
 
-  for (int pin : potPins) {
-    if (pin != -1) hardwareData += getPotPinStatus(pin);
+  // get pin string status for analog pins
+  for (int pin : pinsAnalog) {
+    if (pin != -1) hardwareData += getAnalogStatus(pin);
   }
 
-  for (int pin : btnPins) {
-    if (pin != -1) hardwareData += getBtnPinStatus(pin);
+  // get pin string status for digital pins
+  for (int pin : pinsDigital) {
+    if (pin != -1) hardwareData += getDigitalStatus(pin);
+  }
+
+  // get pin string status for digital pullup pins
+  for (int pin : pinsPullup) {
+    if (pin != -1) hardwareData += getPullupStatus(pin);
   }
 
   Serial.println(hardwareData);
@@ -135,15 +83,39 @@ void loop() {
   delay(20);
 }
 
-void initializeEmptyConfig() {
-  for (int i = 0; i < MAX_SIZE; i++) {
-    btnPins[i] = -1;
-    potPins[i] = -1;
-  }
+// ---- array helper functions ----------------------------------------------------
 
-  totPins = 0;
+// 'erases' an assignment array given a pointer
+void eraseArray(int* arr) {
+  // iterate over array and set values to '-1'
+  for (int i = 0; i < MAX_SIZE; i++) arr[i] = -1;
 }
 
+// returns the first index of a value in an array
+int getIndexInArray(int* arr, int value) {
+  int idx = -1;
+  // iterate over array
+  for (int i = 0; i < MAX_SIZE; i++) {
+    if (arr[i] == value) {
+      idx = i;
+      break;
+    }
+  }
+  // return result
+  return idx;
+}
+
+// --------------------------------------------------------------------------------
+
+// init config (remove later)
+void initializeEmptyConfig() {
+  eraseArray(pinsDigital);
+  eraseArray(pinsPullup);
+  eraseArray(pinsAnalog);
+  totalPins = 0;
+}
+
+// load config (remove later)
 void loadConfigFromEEPROM() {
   SavedConfig config;
   EEPROM.get(0, config);
@@ -155,11 +127,13 @@ void loadConfigFromEEPROM() {
   }
 
   for (int i = 0; i < MAX_SIZE; i++) {
-    btnPins[i] = config.btnPins[i];
-    potPins[i] = config.potPins[i];
+    pinsDigital[i] = config.pinsDigital[i];
+    pinsPullup[i] = config.pinsPullup[i];
+    pinsAnalog[i] = config.pinsAnalog[i];
   }
 }
 
+// save to config (remove later)
 void saveConfigToEEPROM() {
   SavedConfig config;
 
@@ -167,125 +141,107 @@ void saveConfigToEEPROM() {
   config.version = EEPROM_VERSION;
 
   for (int i = 0; i < MAX_SIZE; i++) {
-    config.btnPins[i] = btnPins[i];
-    config.potPins[i] = potPins[i];
+    config.pinsDigital[i] = pinsDigital[i];
+    config.pinsPullup[i] = pinsPullup[i];
+    config.pinsAnalog[i] = pinsAnalog[i];
   }
 
   EEPROM.put(0, config);
 }
 
+// arduino pin mode stuff
 void applyPinModes() {
-  for (int pin : btnPins) {
+  for (int pin : pinsDigital) {
+    if (pin != -1) {
+      pinMode(pin, INPUT);
+    }
+  }
+
+  for (int pin : pinsPullup) {
     if (pin != -1) {
       pinMode(pin, INPUT_PULLUP);
     }
   }
 
-  for (int pin : potPins) {
+  for (int pin : pinsAnalog) {
     if (pin != -1) {
       pinMode(pin, INPUT);
     }
   }
 }
 
+// clear config
 void clearAssignments() {
   initializeEmptyConfig();
   recalculateTotalPins();
 }
 
+// get total number of pins
 void recalculateTotalPins() {
   int tot = 0;
 
-  for (int pin : btnPins) {
+  for (int pin : pinsDigital) {
     if (pin != -1) tot++;
   }
 
-  for (int pin : potPins) {
+  for (int pin : pinsPullup) {
     if (pin != -1) tot++;
   }
 
-  totPins = tot;
+  for (int pin : pinsAnalog) {
+    if (pin != -1) tot++;
+  }
+
+  totalPins = tot;
 }
 
-void addBtn(int i) {
-  for (int idx = 0; idx < MAX_SIZE; idx++) {
-    if (btnPins[idx] == i) return;
-  }
+// set pin to digital input
+void setInput(int pin) {
+  removeInput(pin);
 
-  for (int idx = 0; idx < MAX_SIZE; idx++) {
-    if (potPins[idx] == i) {
-      removePot(i);
-      break;
-    }
-  }
+  int targetIdx = getIndexInArray(pinsDigital, -1);
+  if (targetIdx == -1) return;
 
-  for (int idx = 0; idx < MAX_SIZE; idx++) {
-    if (btnPins[idx] == -1) {
-      btnPins[idx] = i;
-      break;
-    }
-  }
+  pinsDigital[targetIdx] = pin;
+  pinMode(pin, INPUT);
 }
 
-void removeBtn(int i) {
-  int targetIdx = -1;
+// set pin to digital pullup input
+void setInputPullup(int pin) {
+  removeInput(pin);
 
-  for (int idx = 0; idx < MAX_SIZE; idx++) {
-    if (btnPins[idx] == i) {
-      targetIdx = idx;
-      break;
-    }
-  }
+  int targetIdx = getIndexInArray(pinsPullup, -1);
+  if (targetIdx == -1) return;
 
-  if (targetIdx != -1) {
-    for (int idx = targetIdx; idx < MAX_SIZE - 1; idx++) {
-      btnPins[idx] = btnPins[idx + 1];
-    }
-
-    btnPins[MAX_SIZE - 1] = -1;
-  }
+  pinsPullup[targetIdx] = pin;
+  pinMode(pin, INPUT_PULLUP);
 }
 
-void addPot(int i) {
-  for (int idx = 0; idx < MAX_SIZE; idx++) {
-    if (potPins[idx] == i) return;
-  }
+// set pin to analog input
+void setInputAnalog(int pin) {
+  removeInput(pin);
 
-  for (int idx = 0; idx < MAX_SIZE; idx++) {
-    if (btnPins[idx] == i) {
-      removeBtn(i);
-      break;
-    }
-  }
+  int targetIdx = getIndexInArray(pinsAnalog, -1);
+  if (targetIdx == -1) return;
 
-  for (int idx = 0; idx < MAX_SIZE; idx++) {
-    if (potPins[idx] == -1) {
-      potPins[idx] = i;
-      break;
-    }
-  }
+  pinsAnalog[targetIdx] = pin;
+  pinMode(pin, INPUT);
 }
 
-void removePot(int i) {
-  int targetIdx = -1;
-
-  for (int idx = 0; idx < MAX_SIZE; idx++) {
-    if (potPins[idx] == i) {
-      targetIdx = idx;
-      break;
-    }
-  }
-
-  if (targetIdx != -1) {
-    for (int idx = targetIdx; idx < MAX_SIZE - 1; idx++) {
-      potPins[idx] = potPins[idx + 1];
-    }
-
-    potPins[MAX_SIZE - 1] = -1;
-  }
+// unassign a pin from being an input
+void removeInput(int pin) {
+  // check arrays for pin
+  int digitalIdx = getIndexInArray(pinsDigital, pin);
+  int pullupIdx = getIndexInArray(pinsPullup, pin);
+  int analogIdx = getIndexInArray(pinsAnalog, pin);
+  // remove pin from arrays
+  if (digitalIdx != -1) pinsDigital[digitalIdx] = -1;
+  if (pullupIdx != -1) pinsPullup[pullupIdx] = -1;
+  if (analogIdx != -1) pinsAnalog[analogIdx] = -1;
 }
 
-String getPotPinStatus(int pin) {
+// returns formatted serial string for an analog pin
+String getAnalogStatus(int pin) {
   int inp = analogRead(pin);
   inp = map(inp, 0, 1023, 0, 100);
   inp = constrain(inp, 0, 100);
@@ -293,12 +249,21 @@ String getPotPinStatus(int pin) {
   return String(pin) + "P" + intWithZeros(inp) + " ";
 }
 
-String getBtnPinStatus(int pin) {
+// returns formatted serial string for a digital pin
+String getDigitalStatus(int pin) {
+  int inp = digitalRead(pin);
+
+  return String(pin) + "B" + String(inp) + " ";
+}
+
+// returns formatted serial string for a pullup pin
+String getPullupStatus(int pin) {
   int inp = digitalRead(pin);
 
   return String(pin) + "B" + String(!inp) + " ";
 }
 
+// helper for adding zeros to int strings
 String intWithZeros(int i) {
   String intStr = String(i);
 
@@ -308,6 +273,7 @@ String intWithZeros(int i) {
   return intStr;
 }
 
+// string splitter helper
 String getValue(String data, char separator, int index) {
   int found = 0;
   int strIndex[] = {0, -1};
