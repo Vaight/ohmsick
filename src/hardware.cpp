@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cerrno>
 #include <charconv>
 #include <cmath>
@@ -6,6 +7,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 #ifdef _WIN32
@@ -167,12 +169,28 @@ std::string SerialReader::readAvailable() const {
     return hardware::readAvailable(handle_);
 }
 
+void SerialReader::write(std::string_view message) const {
+    if (handle_ == invalidSerialHandle) {
+        throw std::runtime_error("Serial write failed: port is not open");
+    }
+
+    writeSerial(handle_, message);
+}
+
+void SerialReader::sendLine(std::string_view message) const {
+    if (handle_ == invalidSerialHandle) {
+        throw std::runtime_error("Serial write failed: port is not open");
+    }
+
+    sendSerialLine(handle_, message);
+}
+
 NativeSerialHandle openSerialPort(const std::string& device, int baud) {
 #ifdef _WIN32
     const std::string normalizedDevice = normalizeWindowsDeviceName(device);
     HANDLE handle = CreateFileA(
         normalizedDevice.c_str(),
-        GENERIC_READ,
+        GENERIC_READ | GENERIC_WRITE,
         0,
         nullptr,
         OPEN_EXISTING,
@@ -216,7 +234,7 @@ NativeSerialHandle openSerialPort(const std::string& device, int baud) {
     PurgeComm(handle, PURGE_RXCLEAR | PURGE_TXCLEAR);
     return handle;
 #else
-    const int fd = open(device.c_str(), O_RDONLY | O_NOCTTY | O_NONBLOCK);
+    const int fd = open(device.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (fd == -1) {
         throw std::runtime_error("Could not open " + device + ": " + std::strerror(errno));
     }
@@ -277,6 +295,58 @@ std::string readAvailable(NativeSerialHandle serialHandle) {
 
     return {};
 #endif
+}
+
+void writeSerial(NativeSerialHandle serialHandle, std::string_view message) {
+#ifdef _WIN32
+    const char* cursor = message.data();
+    std::size_t remaining = message.size();
+
+    while (remaining > 0) {
+        DWORD written = 0;
+        const DWORD chunkSize = static_cast<DWORD>(std::min<std::size_t>(remaining, 4096));
+        if (!WriteFile(serialHandle, cursor, chunkSize, &written, nullptr)) {
+            throw std::runtime_error(windowsErrorMessage("Serial write failed"));
+        }
+
+        if (written == 0) {
+            throw std::runtime_error("Serial write failed: wrote zero bytes");
+        }
+
+        cursor += written;
+        remaining -= written;
+    }
+#else
+    const char* cursor = message.data();
+    std::size_t remaining = message.size();
+
+    while (remaining > 0) {
+        const ssize_t written = ::write(serialHandle, cursor, remaining);
+        if (written == -1) {
+            if (errno == EINTR) {
+                continue;
+            }
+
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
+            }
+
+            throw std::runtime_error("Serial write failed: " + std::string(std::strerror(errno)));
+        }
+
+        if (written == 0) {
+            throw std::runtime_error("Serial write failed: wrote zero bytes");
+        }
+
+        cursor += written;
+        remaining -= static_cast<std::size_t>(written);
+    }
+#endif
+}
+
+void sendSerialLine(NativeSerialHandle serialHandle, std::string_view message) {
+    writeSerial(serialHandle, message);
+    writeSerial(serialHandle, "\n");
 }
 
 std::optional<Frame> parseFrame(std::string_view line) {

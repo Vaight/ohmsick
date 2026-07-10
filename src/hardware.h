@@ -56,6 +56,8 @@ public:
     bool isOpen() const;
     NativeSerialHandle nativeHandle() const;
     std::string readAvailable() const;
+    void write(std::string_view message) const;
+    void sendLine(std::string_view message) const;
 
 private:
     NativeSerialHandle handle_ = invalidSerialHandle;
@@ -63,6 +65,8 @@ private:
 
 NativeSerialHandle openSerialPort(const std::string& device, int baud);
 std::string readAvailable(NativeSerialHandle serialHandle);
+void writeSerial(NativeSerialHandle serialHandle, std::string_view message);
+void sendSerialLine(NativeSerialHandle serialHandle, std::string_view message);
 std::optional<Frame> parseFrame(std::string_view line);
 std::string formatFrame(const Frame& frame);
 ParsedLine parseLine(const std::string& line);

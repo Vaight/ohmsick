@@ -34,6 +34,7 @@ target_link_libraries(hardware_parser_tests PRIVATE hardware_backend)
 juce_add_plugin(vst3arduinothing_vst3
     PRODUCT_NAME "VST3 Arduino Thing"
     PLUGIN_NAME "VST3 Arduino Thing"
+    DESCRIPTION "VST3 Arduino Thing"
     COMPANY_NAME "vaight"
     COMPANY_WEBSITE "https://example.com"
     COMPANY_EMAIL "support@example.com"
