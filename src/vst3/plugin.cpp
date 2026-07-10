@@ -1,9 +1,9 @@
 #include "plugin.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
-#include <iomanip>
 #include <sstream>
 #include <utility>
 
@@ -43,8 +43,14 @@ int normalizedToMidiValue(float value) {
     return juce::jlimit(0, 127, juce::roundToInt(clamp01(value) * 127.0f));
 }
 
-juce::String kindName(hardware::Kind kind) {
-    return kind == hardware::Kind::Button ? "Button" : "Pot";
+juce::String assignmentActionName(int action) {
+    switch (action) {
+        case 0: return "Remove";
+        case 1: return "Digital";
+        case 2: return "Pullup";
+        case 3: return "Analog";
+        default: return "Unknown";
+    }
 }
 
 }  // namespace
@@ -78,12 +84,35 @@ public:
         statusLabel_.setJustificationType(juce::Justification::centredLeft);
         addAndMakeVisible(statusLabel_);
 
-        inputView_.setMultiLine(true);
-        inputView_.setReadOnly(true);
-        inputView_.setScrollbarsShown(true);
-        inputView_.setCaretVisible(false);
-        inputView_.setFont(juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 13.0f, juce::Font::plain)));
-        addAndMakeVisible(inputView_);
+        pinLabel_.setText("Pin", juce::dontSendNotification);
+        pinLabel_.attachToComponent(&pinEditor_, true);
+        addAndMakeVisible(pinLabel_);
+
+        pinEditor_.setInputRestrictions(4, "0123456789");
+        pinEditor_.setTextToShowWhenEmpty("0", juce::Colours::grey);
+        addAndMakeVisible(pinEditor_);
+
+        typeLabel_.setText("Type", juce::dontSendNotification);
+        typeLabel_.attachToComponent(&typeBox_, true);
+        addAndMakeVisible(typeLabel_);
+
+        typeBox_.addItem("Remove", 1);
+        typeBox_.addItem("Digital", 2);
+        typeBox_.addItem("Pullup", 3);
+        typeBox_.addItem("Analog", 4);
+        typeBox_.setSelectedId(2, juce::dontSendNotification);
+        addAndMakeVisible(typeBox_);
+
+        sendButton_.setButtonText("Send");
+        sendButton_.onClick = [this] { sendMapping(); };
+        addAndMakeVisible(sendButton_);
+
+        mappingsView_.setMultiLine(true);
+        mappingsView_.setReadOnly(true);
+        mappingsView_.setScrollbarsShown(true);
+        mappingsView_.setCaretVisible(false);
+        mappingsView_.setFont(juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 13.0f, juce::Font::plain)));
+        addAndMakeVisible(mappingsView_);
 
         logView_.setMultiLine(true);
         logView_.setReadOnly(true);
@@ -124,7 +153,16 @@ public:
         statusLabel_.setBounds(statusRow);
 
         bounds.removeFromTop(8);
-        inputView_.setBounds(bounds.removeFromTop(330));
+        auto mappingRow = bounds.removeFromTop(28);
+        mappingRow.removeFromLeft(32);
+        pinEditor_.setBounds(mappingRow.removeFromLeft(70));
+        mappingRow.removeFromLeft(48);
+        typeBox_.setBounds(mappingRow.removeFromLeft(120));
+        mappingRow.removeFromLeft(8);
+        sendButton_.setBounds(mappingRow.removeFromLeft(80));
+
+        bounds.removeFromTop(8);
+        mappingsView_.setBounds(bounds.removeFromTop(110));
 
         bounds.removeFromTop(8);
         logView_.setBounds(bounds);
@@ -144,12 +182,24 @@ private:
         updateConnectionState();
     }
 
+    void sendMapping() {
+        const int pin = pinEditor_.getText().getIntValue();
+        const int action = typeBox_.getSelectedId() - 1;
+        if (action < 0 || action > 3) {
+            return;
+        }
+
+        processor_.sendAssignmentCommand(pin, action);
+        renderSessionMappings();
+    }
+
     void updateConnectionState() {
         const bool connected = processor_.isSerialConnected();
         connectButton_.setButtonText(connected ? "Disconnect" : "Connect");
 
         const auto config = processor_.getSerialConfig();
         const int activeCount = countActiveInputs();
+        sendButton_.setEnabled(connected);
         statusLabel_.setText(
             (connected ? "Connected" : "Not connected")
                 + juce::String(" | Mode: MIDI CC instrument | Ch ")
@@ -180,7 +230,7 @@ private:
             lastRenderedLineCount_ = logLines_.size();
         }
 
-        renderInputTable();
+        renderSessionMappings();
         updateConnectionState();
     }
 
@@ -195,28 +245,23 @@ private:
         return count;
     }
 
-    void renderInputTable() {
-        const auto inputs = processor_.getInputSnapshots();
+    void renderSessionMappings() {
+        const auto mappings = processor_.getSessionMappings();
         std::ostringstream out;
-        out << "Input Active Type   Ch  CC  MIDI  Value\n";
-        out << "----- ------ ------ --- --- ----- -------\n";
-
-        for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
-            const auto& input = inputs[static_cast<size_t>(slot)];
-            out << std::setw(5) << (slot + 1) << ' '
-                << std::setw(6) << (input.active ? "yes" : "no") << ' '
-                << std::setw(6) << kindName(input.kind).toStdString() << ' '
-                << std::setw(3) << input.midiChannel << ' '
-                << std::setw(3) << input.midiCc << ' '
-                << std::setw(5) << input.midiValue << ' '
-                << std::fixed << std::setprecision(3)
-                << std::setw(7) << input.normalizedValue << '\n';
+        out << "Current session mappings\n";
+        if (mappings.empty()) {
+            out << "(none)\n";
+        } else {
+            for (const auto& mapping : mappings) {
+                out << "Pin " << mapping.pin << " ~> "
+                    << assignmentActionName(mapping.action).toStdString() << '\n';
+            }
         }
 
         const juce::String nextText(out.str());
-        if (nextText != lastInputTableText_) {
-            inputView_.setText(nextText, false);
-            lastInputTableText_ = nextText;
+        if (nextText != lastMappingsText_) {
+            mappingsView_.setText(nextText, false);
+            lastMappingsText_ = nextText;
         }
     }
 
@@ -229,10 +274,15 @@ private:
     juce::ComboBox baudBox_;
     juce::TextButton connectButton_;
     juce::Label statusLabel_;
-    juce::TextEditor inputView_;
+    juce::Label pinLabel_;
+    juce::TextEditor pinEditor_;
+    juce::Label typeLabel_;
+    juce::ComboBox typeBox_;
+    juce::TextButton sendButton_;
+    juce::TextEditor mappingsView_;
     juce::TextEditor logView_;
     juce::StringArray logLines_;
-    juce::String lastInputTableText_;
+    juce::String lastMappingsText_;
     int lastRenderedLineCount_ = -1;
 };
 
@@ -457,6 +507,27 @@ juce::StringArray HardwareControlAudioProcessor::drainSerialLogLines() {
     return lines;
 }
 
+void HardwareControlAudioProcessor::sendAssignmentCommand(int pin, int action) {
+    if (pin < 0 || action < 0 || action > 3) {
+        pushSerialLogLine("Invalid assignment command");
+        return;
+    }
+
+    if (!isSerialConnected()) {
+        pushSerialLogLine("Not connected; assignment was not sent");
+        return;
+    }
+
+    const std::string command = "a " + std::to_string(pin) + " " + std::to_string(action);
+    {
+        const std::lock_guard<std::mutex> lock(outgoingSerialMutex_);
+        outgoingSerialLines_.push_back(command);
+    }
+
+    updateSessionMapping(pin, action);
+    pushSerialLogLine("Queued: " + juce::String(command));
+}
+
 std::array<HardwareControlAudioProcessor::InputSnapshot, hardware::maxInputSlots>
 HardwareControlAudioProcessor::getInputSnapshots() const {
     std::array<InputSnapshot, hardware::maxInputSlots> snapshots {};
@@ -474,6 +545,12 @@ HardwareControlAudioProcessor::getInputSnapshots() const {
     }
 
     return snapshots;
+}
+
+std::vector<HardwareControlAudioProcessor::SessionMapping>
+HardwareControlAudioProcessor::getSessionMappings() const {
+    const std::lock_guard<std::mutex> lock(sessionMappingsMutex_);
+    return sessionMappings_;
 }
 
 void HardwareControlAudioProcessor::startSerialThread() {
@@ -508,6 +585,11 @@ void HardwareControlAudioProcessor::serialThreadMain(SerialConfig config) {
         std::array<float, hardware::maxInputSlots> smoothedValues {};
 
         while (!stopSerialThread_.load()) {
+            for (const auto& command : drainOutgoingSerialLines()) {
+                reader.sendLine(command);
+                pushSerialLogLine("Sent: " + juce::String(command));
+            }
+
             serialBuffer += reader.readAvailable();
 
             std::size_t newline = std::string::npos;
@@ -581,6 +663,40 @@ void HardwareControlAudioProcessor::pushSerialLogLine(const juce::String& line) 
     while (serialLogLines_.size() > 200) {
         serialLogLines_.pop_front();
     }
+}
+
+std::vector<std::string> HardwareControlAudioProcessor::drainOutgoingSerialLines() {
+    std::vector<std::string> lines;
+    const std::lock_guard<std::mutex> lock(outgoingSerialMutex_);
+
+    while (!outgoingSerialLines_.empty()) {
+        lines.push_back(std::move(outgoingSerialLines_.front()));
+        outgoingSerialLines_.pop_front();
+    }
+
+    return lines;
+}
+
+void HardwareControlAudioProcessor::updateSessionMapping(int pin, int action) {
+    const std::lock_guard<std::mutex> lock(sessionMappingsMutex_);
+    const auto existing = std::find_if(
+        sessionMappings_.begin(),
+        sessionMappings_.end(),
+        [pin](const SessionMapping& mapping) { return mapping.pin == pin; });
+
+    if (action == 0) {
+        if (existing != sessionMappings_.end()) {
+            sessionMappings_.erase(existing);
+        }
+        return;
+    }
+
+    if (existing != sessionMappings_.end()) {
+        existing->action = action;
+        return;
+    }
+
+    sessionMappings_.push_back({ pin, action });
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {

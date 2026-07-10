@@ -5,6 +5,7 @@
 #include <deque>
 #include <mutex>
 #include <thread>
+#include <vector>
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -50,6 +51,7 @@ public:
     void disconnectSerial();
     bool isSerialConnected() const;
     juce::StringArray drainSerialLogLines();
+    void sendAssignmentCommand(int pin, int action);
 
     struct InputSnapshot {
         bool active = false;
@@ -62,6 +64,13 @@ public:
 
     std::array<InputSnapshot, hardware::maxInputSlots> getInputSnapshots() const;
 
+    struct SessionMapping {
+        int pin = 0;
+        int action = 0;
+    };
+
+    std::vector<SessionMapping> getSessionMappings() const;
+
 private:
     static SerialConfig loadSerialConfig();
 
@@ -69,6 +78,8 @@ private:
     void stopSerialThread();
     void serialThreadMain(SerialConfig config);
     void pushSerialLogLine(const juce::String& line);
+    std::vector<std::string> drainOutgoingSerialLines();
+    void updateSessionMapping(int pin, int action);
 
     SerialConfig serialConfig_;
     mutable std::mutex serialConfigMutex_;
@@ -77,6 +88,10 @@ private:
     std::thread serialThread_;
     std::mutex serialLogMutex_;
     std::deque<juce::String> serialLogLines_;
+    std::mutex outgoingSerialMutex_;
+    std::deque<std::string> outgoingSerialLines_;
+    mutable std::mutex sessionMappingsMutex_;
+    std::vector<SessionMapping> sessionMappings_;
 
     std::array<std::atomic<float>, hardware::maxInputSlots> targetValues_ {};
     std::array<std::atomic<int>, hardware::maxInputSlots> targetKinds_ {};
