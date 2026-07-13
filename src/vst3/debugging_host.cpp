@@ -9,7 +9,7 @@ constexpr int blockSize = 512;
  * the current name of the built vst3 artefact.
  */
 juce::String defaultPluginName() {
-    return "VST3 Arduino Thing.vst3";
+    return "Ohmsick.vst3";
 }
 
 /*
@@ -37,11 +37,11 @@ juce::File findPluginArtefact() {
         const juce::Array<juce::File> candidates {
             root.getChildFile(pluginName),
             root.getChildFile("VST3").getChildFile(pluginName),
-            root.getChildFile("vst3arduinothing_vst3_artefacts").getChildFile("VST3").getChildFile(pluginName),
-            root.getChildFile("vst3arduinothing_vst3_artefacts").getChildFile("Debug").getChildFile("VST3").getChildFile(pluginName),
-            root.getChildFile("vst3arduinothing_vst3_artefacts").getChildFile("Release").getChildFile("VST3").getChildFile(pluginName),
-            root.getChildFile("vst3arduinothing_vst3_artefacts").getChildFile("RelWithDebInfo").getChildFile("VST3").getChildFile(pluginName),
-            root.getChildFile("vst3arduinothing_vst3_artefacts").getChildFile("MinSizeRel").getChildFile("VST3").getChildFile(pluginName),
+            root.getChildFile("ohmsick_vst3_artefacts").getChildFile("VST3").getChildFile(pluginName),
+            root.getChildFile("ohmsick_vst3_artefacts").getChildFile("Debug").getChildFile("VST3").getChildFile(pluginName),
+            root.getChildFile("ohmsick_vst3_artefacts").getChildFile("Release").getChildFile("VST3").getChildFile(pluginName),
+            root.getChildFile("ohmsick_vst3_artefacts").getChildFile("RelWithDebInfo").getChildFile("VST3").getChildFile(pluginName),
+            root.getChildFile("ohmsick_vst3_artefacts").getChildFile("MinSizeRel").getChildFile("VST3").getChildFile(pluginName),
         };
 
         for (const auto& candidate : candidates) {

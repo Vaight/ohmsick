@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.0)
-project(vst3arduinothing VERSION 0.1.0 LANGUAGES C CXX)
+project(ohmsick VERSION 0.1.0 LANGUAGES C CXX)
 
 include(FetchContent)
 
@@ -19,11 +19,11 @@ set_target_properties(hardware_backend PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(hardware_backend PUBLIC src)
 target_compile_features(hardware_backend PUBLIC cxx_std_17)
 
-add_executable(vst3arduinothing
+add_executable(ohmsick
     src/cli.cpp
 )
-target_compile_features(vst3arduinothing PRIVATE cxx_std_17)
-target_link_libraries(vst3arduinothing PRIVATE hardware_backend)
+target_compile_features(ohmsick PRIVATE cxx_std_17)
+target_link_libraries(ohmsick PRIVATE hardware_backend)
 
 add_executable(hardware_parser_tests
     src/hardware_tests.cpp
@@ -31,14 +31,14 @@ add_executable(hardware_parser_tests
 target_compile_features(hardware_parser_tests PRIVATE cxx_std_17)
 target_link_libraries(hardware_parser_tests PRIVATE hardware_backend)
 
-juce_add_plugin(vst3arduinothing_vst3
-    PRODUCT_NAME "VST3 Arduino Thing"
-    PLUGIN_NAME "VST3 Arduino Thing"
-    DESCRIPTION "VST3 Arduino Thing"
+juce_add_plugin(ohmsick_vst3
+    PRODUCT_NAME "Ohmsick"
+    PLUGIN_NAME "Ohmsick"
+    DESCRIPTION "Ohmsick"
     COMPANY_NAME "vaight"
     COMPANY_WEBSITE "https://example.com"
     COMPANY_EMAIL "support@example.com"
-    BUNDLE_ID "com.vaight.vst3arduinothing"
+    BUNDLE_ID "com.vaight.ohmsick"
     PLUGIN_MANUFACTURER_CODE Vaig
     PLUGIN_CODE Vat1
     FORMATS VST3
@@ -49,28 +49,27 @@ juce_add_plugin(vst3arduinothing_vst3
     IS_MIDI_EFFECT FALSE
 )
 
-target_sources(vst3arduinothing_vst3 PRIVATE
-    src/vst3/display.cpp
+target_sources(ohmsick_vst3 PRIVATE
     src/vst3/plugin.cpp
 )
-target_include_directories(vst3arduinothing_vst3 PRIVATE src)
-target_compile_features(vst3arduinothing_vst3 PRIVATE cxx_std_17)
-target_compile_definitions(vst3arduinothing_vst3
+target_include_directories(ohmsick_vst3 PRIVATE src)
+target_compile_features(ohmsick_vst3 PRIVATE cxx_std_17)
+target_compile_definitions(ohmsick_vst3
     PUBLIC
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
 )
-target_link_libraries(vst3arduinothing_vst3
+target_link_libraries(ohmsick_vst3
     PRIVATE
         hardware_backend
         juce::juce_audio_utils
 )
 
 juce_add_gui_app(debug_host
-    PRODUCT_NAME "VST3 Arduino Thing Debug Host"
+    PRODUCT_NAME "Ohmsick Debug Host"
     COMPANY_NAME "vaight"
-    BUNDLE_ID "com.vaight.vst3arduinothing.debughost"
+    BUNDLE_ID "com.vaight.ohmsick.debughost"
 )
 target_sources(debug_host PRIVATE
     src/vst3/debugging_host.cpp
@@ -90,4 +89,4 @@ target_link_libraries(debug_host
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
 )
-add_dependencies(debug_host vst3arduinothing_vst3)
+add_dependencies(debug_host ohmsick_vst3)
