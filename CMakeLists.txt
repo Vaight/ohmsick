@@ -51,6 +51,7 @@ juce_add_plugin(ohmsick_vst3
 
 target_sources(ohmsick_vst3 PRIVATE
     src/vst3/plugin.cpp
+    src/vst3/display.cpp
 )
 target_include_directories(ohmsick_vst3 PRIVATE src)
 target_compile_features(ohmsick_vst3 PRIVATE cxx_std_17)
