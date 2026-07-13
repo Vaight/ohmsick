@@ -16,19 +16,19 @@ constexpr int firstMidiCc = 1;
 juce::File configFilePath() {
     if (const char* appData = std::getenv("APPDATA")) {
         if (*appData != '\0') {
-            return juce::File(juce::String(appData)).getChildFile("vst3arduinothing/config.json");
+            return juce::File(juce::String(appData)).getChildFile("ohmsick/config.json");
         }
     }
 
     if (const char* xdgConfig = std::getenv("XDG_CONFIG_HOME")) {
         if (*xdgConfig != '\0') {
-            return juce::File(juce::String(xdgConfig)).getChildFile("vst3arduinothing/config.json");
+            return juce::File(juce::String(xdgConfig)).getChildFile("ohmsick/config.json");
         }
     }
 
     if (const char* home = std::getenv("HOME")) {
         if (*home != '\0') {
-            return juce::File(juce::String(home)).getChildFile(".config/vst3arduinothing/config.json");
+            return juce::File(juce::String(home)).getChildFile(".config/ohmsick/config.json");
         }
     }
 

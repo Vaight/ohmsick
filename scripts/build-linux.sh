@@ -25,7 +25,7 @@ fi
 
 cmake "${build_args[@]}"
 
-VST3_PATH="$BUILD_DIR/vst3arduinothing_vst3_artefacts/$CONFIG/VST3/VST3 Arduino Thing.vst3"
+VST3_PATH="$BUILD_DIR/ohmsick_vst3_artefacts/$CONFIG/VST3/Ohmsick.vst3"
 if [[ -d "$VST3_PATH" ]]; then
     printf 'Built VST3: %s\n' "$VST3_PATH"
 fi

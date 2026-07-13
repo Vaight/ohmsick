@@ -50,13 +50,13 @@ cmake --build build
 The compiled <b>VST3</b> is currently found at...
 
 ```
-build-$target$/vst3arduinothing_vst3_artefacts/Release/VST3/VST3 Arduino Thing.vst
+build-$target$/ohmsick_vst3_artefacts/Release/VST3/Ohmsick.vst
 ```
 
 Included in this project is a really small VST3 debug host application. This currently can be found at...
 
 ```
-build-$target$/debug_host_artefacts/Release/VST3 Arduino Thing Debug Host
+build-$target$/debug_host_artefacts/Release/Ohmsick Debug Host
 ```
 
 <br><br>
