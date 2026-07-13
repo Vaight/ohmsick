@@ -114,9 +114,9 @@ public:
         mappingsView_.setFont(juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 13.0f, juce::Font::plain)));
         addAndMakeVisible(mappingsView_);
 
-        logView_.setMultiLine(true);
+        logView_.setMultiLine(false);
         logView_.setReadOnly(true);
-        logView_.setScrollbarsShown(true);
+        logView_.setScrollbarsShown(false);
         logView_.setCaretVisible(false);
         logView_.setFont(juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 12.0f, juce::Font::plain)));
         addAndMakeVisible(logView_);
@@ -213,21 +213,15 @@ private:
     }
 
     void timerCallback() override {
-        bool logChanged = false;
+        juce::String latestLogLine;
         for (const auto& line : processor_.drainSerialLogLines()) {
-            logLines_.add(line);
-            logChanged = true;
+            latestLogLine = line;
         }
 
-        while (logLines_.size() > maxVisibleLines) {
-            logLines_.remove(0);
-            logChanged = true;
-        }
-
-        if (logChanged || logLines_.size() != lastRenderedLineCount_) {
-            logView_.setText(logLines_.joinIntoString("\n"), false);
+        if (latestLogLine.isNotEmpty() && latestLogLine != lastLogLine_) {
+            logView_.setText(latestLogLine, false);
             logView_.moveCaretToEnd();
-            lastRenderedLineCount_ = logLines_.size();
+            lastLogLine_ = latestLogLine;
         }
 
         renderSessionMappings();
@@ -265,8 +259,6 @@ private:
         }
     }
 
-    static constexpr int maxVisibleLines = 120;
-
     HardwareControlAudioProcessor& processor_;
     juce::Label deviceLabel_;
     juce::TextEditor deviceEditor_;
@@ -281,9 +273,8 @@ private:
     juce::TextButton sendButton_;
     juce::TextEditor mappingsView_;
     juce::TextEditor logView_;
-    juce::StringArray logLines_;
+    juce::String lastLogLine_;
     juce::String lastMappingsText_;
-    int lastRenderedLineCount_ = -1;
 };
 
 HardwareControlAudioProcessor::HardwareControlAudioProcessor()
