@@ -65,3 +65,28 @@ target_link_libraries(vst3arduinothing_vst3
         hardware_backend
         juce::juce_audio_utils
 )
+
+juce_add_gui_app(debug_host
+    PRODUCT_NAME "VST3 Arduino Thing Debug Host"
+    COMPANY_NAME "vaight"
+    BUNDLE_ID "com.vaight.vst3arduinothing.debughost"
+)
+target_sources(debug_host PRIVATE
+    src/vst3/debugging_host.cpp
+)
+target_compile_features(debug_host PRIVATE cxx_std_17)
+target_compile_definitions(debug_host
+    PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_PLUGINHOST_VST3=1
+        DEBUG_HOST_BUILD_DIR="${CMAKE_BINARY_DIR}"
+)
+target_link_libraries(debug_host
+    PRIVATE
+        juce::juce_audio_utils
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+add_dependencies(debug_host vst3arduinothing_vst3)
