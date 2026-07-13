@@ -50,6 +50,7 @@ juce_add_plugin(vst3arduinothing_vst3
 )
 
 target_sources(vst3arduinothing_vst3 PRIVATE
+    src/vst3/display.cpp
     src/vst3/plugin.cpp
 )
 target_include_directories(vst3arduinothing_vst3 PRIVATE src)

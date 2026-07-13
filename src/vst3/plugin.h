@@ -13,6 +13,9 @@
 
 class HardwareControlAudioProcessor final : public juce::AudioProcessor {
 public:
+    static constexpr int midiChannel = 1;
+    static constexpr int firstMidiCc = 1;
+
     HardwareControlAudioProcessor();
     ~HardwareControlAudioProcessor() override;
 
