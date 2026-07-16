@@ -37,12 +37,6 @@ set_target_properties(hardware_backend PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(hardware_backend PUBLIC src)
 target_compile_features(hardware_backend PUBLIC cxx_std_17)
 
-add_executable(ohmsick
-    src/cli.cpp
-)
-target_compile_features(ohmsick PRIVATE cxx_std_17)
-target_link_libraries(ohmsick PRIVATE hardware_backend)
-
 add_executable(hardware_parser_tests
     src/hardware_tests.cpp
 )
