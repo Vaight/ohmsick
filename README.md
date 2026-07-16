@@ -1,4 +1,4 @@
-# <img style="filter:invert(1);" align="left" width="40" height="40" src="ASSETS/chip.svg" alt="Logo"><p style="color:white;"> &nbsp; Ohmsick </p>
+# <p align="center"><img align="center" height="48" src="ASSETS/ohmsick3d.svg" alt="Logo"></p>
 <!-- data placeholders -->
 <p align="center">
     Version: <b>EXP 0.1.8</b>
