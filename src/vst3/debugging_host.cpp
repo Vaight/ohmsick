@@ -2,18 +2,23 @@
 
 namespace {
 
+// engine constants
 constexpr double sampleRate = 44100.0;
 constexpr int blockSize = 512;
 
 /*
- * the current name of the built vst3 artefact.
+ * method that returns the name of the vst3 plugin.
+ * PARAMS: none
+ * RETURNS:
+ *   ∟ juce::String   : the name of the plugin
  */
-juce::String defaultPluginName() {
-    return "Ohmsick.vst3";
-}
+juce::String defaultPluginName() { return "Ohmsick.vst3"; }
 
 /*
- * the list of all root directories to search for the artefact.
+ * method that returns an array of root files/directories to search for plugins.
+ * PARAMS: none
+ * RETURNS:
+ *   ∟ juce::Array<juce::File>   : an array of juce::File objects
  */
 juce::Array<juce::File> pluginSearchRoots() {
     juce::Array<juce::File> roots;
@@ -29,6 +34,9 @@ juce::Array<juce::File> pluginSearchRoots() {
  * this method finds the built juce vst3 artefact in the given root directories.
  * if the artefact directory changes, please change the hard-coded values here.
  * it may be a good idea to add a --path flag to the cli.
+ * PARAMS: none
+ * RETURNS:
+ *   ∟ juce::File   : the plugin artefact
  */
 juce::File findPluginArtefact() {
     const auto pluginName = defaultPluginName();
@@ -57,8 +65,12 @@ juce::File findPluginArtefact() {
 /*
  * this method is a simple wrapper for the plugin artefact finder.
  * instead this uses a command line path
+ * PARAMS:
+ *   ∟ juce::String   : the filepath provided
+ * RETURNS:
+ *   ∟ juce::File     : the file that was found
  */
-juce::File pluginPathFromCommandLine(const juce::String& commandLine) {
+juce::File pluginPathFromCommandLine(const juce::String &commandLine) {
     const auto args = juce::StringArray::fromTokens(commandLine, true);
     if (args.isEmpty()) {
         return findPluginArtefact();
@@ -68,7 +80,7 @@ juce::File pluginPathFromCommandLine(const juce::String& commandLine) {
 }
 
 /* 
- * juce plugin window initializer
+ * juce plugin window class definition
  * this exists so the plugin that is loaded can be displayed.
  */
 class PluginWindow final : public juce::DocumentWindow {
@@ -149,7 +161,7 @@ private:
 };
 
 /*
- * juce host application initializer
+ * juce host application definition
  */
 class DebugHostApplication final : public juce::JUCEApplication {
 public:
