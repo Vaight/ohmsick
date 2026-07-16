@@ -35,10 +35,11 @@ Use the script for your current platform to execute the build!
 
 ```shell
 ./build-linux.sh
+./build-macos.zsh
 ./build-windows.ps1
 ```
 
-If the provided scripts do not work or if you have your own build configuration, use cmake in your terminal directly.
+If the provided scripts do not work or if you have your own build configuration, use cmake in your terminal directly. It will attempt to build the project with your current OS targets and specifications.
 
 ```shell
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug

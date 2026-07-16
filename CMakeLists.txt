@@ -1,4 +1,10 @@
 cmake_minimum_required(VERSION 3.22.0)
+
+if(APPLE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING
+        "Oldest macOS version supported by the compiled binaries")
+endif()
+
 project(ohmsick VERSION 0.1.0 LANGUAGES C CXX)
 
 # load fetcher
@@ -113,3 +119,13 @@ target_link_libraries(debug_host
         juce::juce_recommended_warning_flags
 )
 add_dependencies(debug_host ohmsick_vst3)
+
+if(APPLE)
+    # Aggregate the deliverables expected from an explicit macOS build.
+    add_custom_target(ohmsick_macos
+        DEPENDS
+            ohmsick_vst3
+            debug_host
+            hardware_parser_tests
+    )
+endif()

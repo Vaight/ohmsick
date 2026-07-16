@@ -1,4 +1,8 @@
 build/
 build-linux/
+build-macos/
 build-windows/
+
 .DS_Store
+
+
