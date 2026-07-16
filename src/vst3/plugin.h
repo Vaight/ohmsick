@@ -9,7 +9,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-#include "hardware.h"
+#include "backend.h"
 
 /*
  * JUCE audio processor that converts hardware readings received over serial

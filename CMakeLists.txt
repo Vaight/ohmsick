@@ -31,7 +31,13 @@ FetchContent_MakeAvailable(JUCE)
 FetchContent_MakeAvailable(JIVE)
 
 add_library(hardware_backend STATIC
-    src/hardware.cpp
+    src/backend.h
+    src/backend/protocol.cpp
+    src/backend/protocol.h
+    src/backend/serial_port.cpp
+    src/backend/serial_port.h
+    src/backend/serial_reader.cpp
+    src/backend/serial_reader.h
 )
 set_target_properties(hardware_backend PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(hardware_backend PUBLIC src)
@@ -67,6 +73,7 @@ juce_add_binary_data(ohmsick_gui_assets
 )
 
 target_sources(ohmsick_vst3 PRIVATE
+    src/vst3.h
     src/vst3/plugin.cpp
     src/vst3/display.cpp
 )
