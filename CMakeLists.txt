@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.22.0)
 project(ohmsick VERSION 0.1.0 LANGUAGES C CXX)
 
+# load fetcher
 include(FetchContent)
 
+# juce framework, used for vst3 operation and compilation
 FetchContent_Declare(
     JUCE
     GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
@@ -10,7 +12,17 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE
 )
 
+# jive extention to juce, used for xml based gui
+FetchContent_Declare(
+    JIVE
+    GIT_REPOSITORY https://github.com/ImJimmi/JIVE.git
+    GIT_TAG v1.3.0
+    GIT_SHALLOW TRUE
+)
+
+# load content dependencies
 FetchContent_MakeAvailable(JUCE)
+FetchContent_MakeAvailable(JIVE)
 
 add_library(hardware_backend STATIC
     src/hardware.cpp
@@ -49,6 +61,11 @@ juce_add_plugin(ohmsick_vst3
     IS_MIDI_EFFECT FALSE
 )
 
+juce_add_binary_data(ohmsick_gui_assets
+    SOURCES
+        src/vst3/gui/layout.xml
+)
+
 target_sources(ohmsick_vst3 PRIVATE
     src/vst3/plugin.cpp
     src/vst3/display.cpp
@@ -60,10 +77,15 @@ target_compile_definitions(ohmsick_vst3
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
+    PRIVATE
+        JIVE_GUI_ITEMS_HAVE_STYLE_SHEETS=1
 )
 target_link_libraries(ohmsick_vst3
     PRIVATE
         hardware_backend
+        ohmsick_gui_assets
+        jive::jive_layouts
+        jive::jive_style_sheets
         juce::juce_audio_utils
 )
 

@@ -1,19 +1,24 @@
 #pragma once
 
+#include <jive_layouts/jive_layouts.h>
 #include <juce_audio_processors/juce_audio_processors.h>
-
 #include "plugin.h"
 
-class HardwareControlAudioProcessorEditor final : public juce::AudioProcessorEditor,
-                                                  private juce::Timer {
+// class definition
+class HardwareControlAudioProcessorEditor final : 
+    public juce::AudioProcessorEditor,
+    private juce::Timer
+{
+
 public:
+
     explicit HardwareControlAudioProcessorEditor(HardwareControlAudioProcessor& processor);
     ~HardwareControlAudioProcessorEditor() override;
 
-    void paint(juce::Graphics& graphics) override;
     void resized() override;
 
 private:
+
     void toggleConnection();
     void sendMapping();
     void updateConnectionState();
@@ -22,19 +27,18 @@ private:
     void renderSessionMappings();
 
     HardwareControlAudioProcessor& processor_;
-    juce::Label deviceLabel_;
-    juce::TextEditor deviceEditor_;
-    juce::Label baudLabel_;
-    juce::ComboBox baudBox_;
-    juce::TextButton connectButton_;
-    juce::Label statusLabel_;
-    juce::Label pinLabel_;
-    juce::TextEditor pinEditor_;
-    juce::Label typeLabel_;
-    juce::ComboBox typeBox_;
-    juce::TextButton sendButton_;
-    juce::TextEditor mappingsView_;
-    juce::TextEditor logView_;
+    jive::Interpreter interpreter_;
+    std::unique_ptr<jive::GuiItem> layout_;
+    juce::TextEditor* deviceEditor_ = nullptr;
+    juce::ComboBox* baudBox_ = nullptr;
+    juce::TextButton* connectButton_ = nullptr;
+    juce::Label* statusLabel_ = nullptr;
+    juce::TextEditor* pinEditor_ = nullptr;
+    juce::ComboBox* typeBox_ = nullptr;
+    juce::TextButton* sendButton_ = nullptr;
+    juce::TextEditor* mappingsView_ = nullptr;
+    juce::TextEditor* logView_ = nullptr;
     juce::String lastLogLine_;
     juce::String lastMappingsText_;
+    
 };
