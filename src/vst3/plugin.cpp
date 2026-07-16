@@ -1,5 +1,4 @@
 #include "plugin.h"
-
 #include "display.h"
 
 #include <algorithm>
@@ -12,19 +11,29 @@ namespace {
 
 constexpr float potSmoothingAlpha = 0.25f;
 
+/*
+ * a method that returns the plugin config file.
+ * PARAMS: none
+ * RETURNS:
+ *   ∟ juce::File     : the found config file
+ */
 juce::File configFilePath() {
+    
+    // using APPDAPA (windows)
     if (const char* appData = std::getenv("APPDATA")) {
         if (*appData != '\0') {
             return juce::File(juce::String(appData)).getChildFile("ohmsick/config.json");
         }
     }
 
+    // using xdg config (linux/unix)
     if (const char* xdgConfig = std::getenv("XDG_CONFIG_HOME")) {
         if (*xdgConfig != '\0') {
             return juce::File(juce::String(xdgConfig)).getChildFile("ohmsick/config.json");
         }
     }
 
+    // using home directory (linux/unix)
     if (const char* home = std::getenv("HOME")) {
         if (*home != '\0') {
             return juce::File(juce::String(home)).getChildFile(".config/ohmsick/config.json");
@@ -34,21 +43,44 @@ juce::File configFilePath() {
     return {};
 }
 
+/*
+ * helper method for executing a jlimit clamp between floats 0.0 and 1.0.
+ * PARAMS:
+ *   ∟ float   : the provided float to apply ther jlimit to
+ * RETURNS:
+ *   ∟ float   : the resulting jlimited float
+ */
 float clamp01(float value) {
     return juce::jlimit(0.0f, 1.0f, value);
 }
 
+/*
+ * helper method for executing a jlimit clamp between integers 0 and 127.
+ * PARAMS:
+ *   ∟ float   : the provided float to apply ther jlimit to
+ * RETURNS:
+ *   ∟ int   : the resulting jlimited integer
+ */
 int normalizedToMidiValue(float value) {
     return juce::jlimit(0, 127, juce::roundToInt(clamp01(value) * 127.0f));
 }
 
-}  // namespace
+}  // end namespace
 
-HardwareControlAudioProcessor::HardwareControlAudioProcessor()
-    : AudioProcessor(BusesProperties()
-        .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      serialConfig_(loadSerialConfig()) {
+/*
+ * juce plugin constructor, sets up basic properties
+ * PARAMS: none
+ * RETURNS: none
+ */
+HardwareControlAudioProcessor::HardwareControlAudioProcessor() :
+    // call the audio processor to ensure audio channel output is set to stereo
+    AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+    // call the serial output congifuration
+    serialConfig_(loadSerialConfig())
+{
+    // iterate over the maximum hardware input slots
     for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
+        // 
         targetValues_[slot].store(0.0f);
         targetKinds_[slot].store(static_cast<int>(hardware::Kind::Pot));
         targetHasValue_[slot].store(false);
