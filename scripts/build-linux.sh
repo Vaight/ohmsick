@@ -18,7 +18,7 @@ cmake -S "$ROOT_DIR" -B "$BUILD_DIR" \
     -DCMAKE_BUILD_TYPE="$CONFIG" \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
-build_args=(--build "$BUILD_DIR" --config "$CONFIG")
+build_args=(--build "$BUILD_DIR" --config "$CONFIG" --parallel $(nproc)) # add paralellization
 if [[ -n "$TARGET" ]]; then
     build_args+=(--target "$TARGET")
 fi
