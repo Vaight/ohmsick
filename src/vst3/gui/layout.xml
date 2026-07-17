@@ -2,8 +2,8 @@
 <!-- https://github.com/ImJimmi/JIVE -->
 
 <Component width="620" height="180" padding="8" flex-direction="column">
-    <Component height="32" flex-direction="row" align-items="stretch">
-        <Image id="image-logo" width="24" height="24" margin="4 0 4 0"/>
+    <Component height="48" flex-direction="row" align-items="stretch">
+        <Image id="image-logo" width="48" height="48" margin="0 0 0 0"/>
         <Component flex-grow="1"/>
         <TextEditor id="device-editor" width="190" focusable="1"/>
         <ComboBox id="baud-box" width="90" margin="0 0 0 8">
