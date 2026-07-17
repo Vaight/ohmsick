@@ -54,8 +54,8 @@ juce_add_plugin(ohmsick_vst3
     PLUGIN_NAME "Ohmsick"
     DESCRIPTION "Ohmsick"
     COMPANY_NAME "vaight"
-    COMPANY_WEBSITE "https://example.com"
-    COMPANY_EMAIL "support@example.com"
+    COMPANY_WEBSITE "https://vaight.github.io"
+    COMPANY_EMAIL "thatvaight@gmail.com"
     BUNDLE_ID "com.vaight.ohmsick"
     PLUGIN_MANUFACTURER_CODE Vaig
     PLUGIN_CODE Vat1
