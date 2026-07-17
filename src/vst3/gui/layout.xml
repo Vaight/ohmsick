@@ -15,6 +15,7 @@
             <Option text="115200" enabled="1"/>
         </ComboBox>
         <Button id="connect-button" text="Connect" width="100" margin="0 0 0 8"/>
+        <Button id="about-button" text="?" width="30" margin="0 0 0 8"/>
     </Component>
 
     <Component id="mapping-panel" height="120" margin="8 0 0 0" flex-direction="row" align-items="stretch">

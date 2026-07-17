@@ -56,6 +56,13 @@ private:
     void showNewMappingDialog();
 
     /*
+     * show a simple dialog for about info.
+     * PARAMS: none
+     * RETURNS: none
+     */
+    void showAboutDialog();
+
+    /*
      * send a pin/action assignment to the processor.
      * PARAMS:
      *   ∟ int pin      : hardware pin to assign
@@ -106,6 +113,7 @@ private:
     juce::Label* versionLabel_ = nullptr;
     juce::ComboBox* baudBox_ = nullptr;
     juce::TextButton* connectButton_ = nullptr;
+    juce::TextButton* aboutButton_ = nullptr;
     juce::TextButton* newMapButton_ = nullptr;
     MappingStripComponent* mappingStrip_ = nullptr;
 

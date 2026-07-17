@@ -40,24 +40,39 @@ Component *findComponent(jive::GuiItem &root, const juce::Identifier &id) {
 }
 
 /*
+ * read a string property from the bundled info.json metadata.
+ * PARAMS:
+ *   ∟ juce::Identifier propertyName   : JSON property to read
+ *   ∟ juce::String fallback           : value to use when metadata is unavailable
+ * RETURNS:
+ *   ∟ juce::String                    : metadata property text or fallback
+ */
+juce::String getInfoJsonProperty(
+    const juce::Identifier& propertyName,
+    const juce::String& fallback
+) {
+    const auto metadata = juce::JSON::parse(
+        juce::String::fromUTF8(BinaryData::info_json, BinaryData::info_jsonSize)
+    );
+
+    if (auto* object = metadata.getDynamicObject()) {
+        const auto property = object -> getProperty(propertyName).toString().trim();
+        if (property.isNotEmpty()) {
+            return property;
+        }
+    }
+
+    return fallback;
+}
+
+/*
  * read the GUI version label text from the bundled info.json metadata.
  * PARAMS: none
  * RETURNS:
  *   ∟ juce::String   : info.json version string or plugin fallback version
  */
 juce::String getVersionLabelText() {
-    const auto metadata = juce::JSON::parse(
-        juce::String::fromUTF8(BinaryData::info_json, BinaryData::info_jsonSize)
-    );
-
-    if (auto* object = metadata.getDynamicObject()) {
-        const auto version = object -> getProperty("version").toString().trim();
-        if (version.isNotEmpty()) {
-            return version;
-        }
-    }
-
-    return JucePlugin_VersionString;
+    return getInfoJsonProperty("version", JucePlugin_VersionString);
 }
 
 /*
@@ -67,18 +82,31 @@ juce::String getVersionLabelText() {
  *   ∟ juce::String   : info.json version string or plugin fallback version
  */
 juce::String getVersionFlagLabelText() {
-    const auto metadata = juce::JSON::parse(
-        juce::String::fromUTF8(BinaryData::info_json, BinaryData::info_jsonSize)
-    );
+    return getInfoJsonProperty("version_flag", "");
+}
 
-    if (auto* object = metadata.getDynamicObject()) {
-        const auto flag = object -> getProperty("version_flag").toString().trim();
-        if (flag.isNotEmpty()) {
-            return flag;
-        }
+/*
+ * format about-dialog text from bundled info.json metadata.
+ * PARAMS: none
+ * RETURNS:
+ *   ∟ juce::String   : visible about dialog message
+ */
+juce::String getAboutDialogText() {
+    const auto name = getInfoJsonProperty("name", JucePlugin_Name);
+    const auto version = getVersionLabelText();
+    const auto flag = getVersionFlagLabelText();
+    const auto author = getInfoJsonProperty("author", "");
+
+    juce::String text = name + "\nVersion " + version;
+    if (flag.isNotEmpty()) {
+        text += "-" + flag;
     }
 
-    return "";
+    if (author.isNotEmpty()) {
+        text += "\nby " + author;
+    }
+
+    return text;
 }
 
 } // end namespace
@@ -375,6 +403,7 @@ HardwareControlAudioProcessorEditor::HardwareControlAudioProcessorEditor(
     versionLabel_  = findComponent<juce::Label>(*layout_, "version-label");
     baudBox_       = findComponent<juce::ComboBox>(*layout_, "baud-box");
     connectButton_ = findComponent<juce::TextButton>(*layout_, "connect-button");
+    aboutButton_   = findComponent<juce::TextButton>(*layout_, "about-button");
     newMapButton_  = findComponent<juce::TextButton>(*layout_, "new-map-button");
     mappingStrip_  = findComponent<MappingStripComponent>(*layout_, "mapping-strip");
 
@@ -384,6 +413,7 @@ HardwareControlAudioProcessorEditor::HardwareControlAudioProcessorEditor(
         versionLabel_  != nullptr &&
         baudBox_       != nullptr &&
         connectButton_ != nullptr &&
+        aboutButton_   != nullptr &&
         newMapButton_  != nullptr &&
         mappingStrip_  != nullptr
     );
@@ -395,6 +425,8 @@ HardwareControlAudioProcessorEditor::HardwareControlAudioProcessorEditor(
     newMapButton_  -> setButtonText("+");
     // define button action calls
     connectButton_ -> onClick = [this] { toggleConnection(); };
+    aboutButton_   -> onClick = [this] { showAboutDialog(); };
+    aboutButton_   -> setButtonText("?");
     newMapButton_  -> onClick = [this] { showNewMappingDialog(); };
     mappingStrip_  -> onDelete = [this](int pin) {
         processor_.sendAssignmentCommand(pin, 0);
@@ -504,6 +536,23 @@ void HardwareControlAudioProcessorEditor::showNewMappingDialog() {
                 safeThis -> sendMapping(pin, action > 0 ? action : 1);
             }),
         true);
+}
+
+/*
+ * juce gui method for showing a new about popup.
+ * PARAMS: none
+ * RETURNS:
+ *   ∟ void
+ */
+void HardwareControlAudioProcessorEditor::showAboutDialog() {
+    auto* alert = new juce::AlertWindow(
+        "About",
+        getAboutDialogText(),
+        juce::AlertWindow::NoIcon,
+        this
+    );
+    alert -> addButton("OK", 1);
+    alert -> enterModalState(true, nullptr, true);
 }
 
 /*
