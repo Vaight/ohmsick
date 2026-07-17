@@ -114,10 +114,12 @@ private:
             : pin_(pin), action_(action), onDelete_(std::move(deleteCallback)) {
             typeLabel_.setJustificationType(juce::Justification::centred);
             pinLabel_.setJustificationType(juce::Justification::centred);
+            mccLabel_.setJustificationType(juce::Justification::centred);
             valueLabel_.setJustificationType(juce::Justification::centred);
 
             typeLabel_.setText(assignmentActionLetter(action_), juce::dontSendNotification);
-            pinLabel_.setText(juce::String(pin_), juce::dontSendNotification);
+            pinLabel_.setText("PIN " + juce::String(pin_), juce::dontSendNotification);
+            mccLabel_.setText("CC " + juce::String(pin_), juce::dontSendNotification);
             valueLabel_.setText("--", juce::dontSendNotification);
             deleteButton_.setButtonText("-");
             deleteButton_.onClick = [this] {
@@ -128,6 +130,7 @@ private:
 
             addAndMakeVisible(typeLabel_);
             addAndMakeVisible(pinLabel_);
+            addAndMakeVisible(mccLabel_);
             addAndMakeVisible(valueLabel_);
             addAndMakeVisible(deleteButton_);
         }
@@ -184,6 +187,7 @@ private:
             auto bounds = getLocalBounds().reduced(6);
             typeLabel_.setBounds(bounds.removeFromTop(20));
             pinLabel_.setBounds(bounds.removeFromTop(20));
+            mccLabel_.setBounds(bounds.removeFromTop(20));
             valueLabel_.setBounds(bounds.removeFromTop(22));
             bounds.removeFromTop(6);
             deleteButton_.setBounds(bounds.removeFromTop(24));
@@ -195,6 +199,7 @@ private:
         std::function<void(int)> onDelete_;
         juce::Label typeLabel_;
         juce::Label pinLabel_;
+        juce::Label mccLabel_;
         juce::Label valueLabel_;
         juce::TextButton deleteButton_;
     };
