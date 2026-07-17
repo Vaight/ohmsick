@@ -119,4 +119,12 @@ Currently the tested boards are as follows:
 
 <br><br>
 
+# Tested Host Applications
+Currently the tested applications are as follows:
+| Application / DAW | Type | Status |
+| - | - | - |
+| Ableton Live | VST3 | Successful |
+
+<br><br>
+
 Thanks for taking the time to read this! Message me if you have any issues or problems with this project and i'll be happy to help!

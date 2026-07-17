@@ -49,7 +49,7 @@ add_executable(hardware_parser_tests
 target_compile_features(hardware_parser_tests PRIVATE cxx_std_17)
 target_link_libraries(hardware_parser_tests PRIVATE hardware_backend)
 
-juce_add_plugin(ohmsick_vst3
+juce_add_plugin(ohmsick_plugin
     PRODUCT_NAME "Ohmsick"
     PLUGIN_NAME "Ohmsick"
     DESCRIPTION "Ohmsick"
@@ -59,7 +59,7 @@ juce_add_plugin(ohmsick_vst3
     BUNDLE_ID "com.vaight.ohmsick"
     PLUGIN_MANUFACTURER_CODE Vaig
     PLUGIN_CODE Vat1
-    FORMATS VST3
+    FORMATS VST3 AU
     VST3_CATEGORIES Instrument External
     IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
@@ -74,14 +74,15 @@ juce_add_binary_data(ohmsick_gui_assets
         src/vst3/gui/ohm.png
 )
 
-target_sources(ohmsick_vst3 PRIVATE
+target_sources(ohmsick_plugin PRIVATE
     src/vst3.h
     src/vst3/plugin.cpp
     src/vst3/display.cpp
 )
-target_include_directories(ohmsick_vst3 PRIVATE src)
-target_compile_features(ohmsick_vst3 PRIVATE cxx_std_17)
-target_compile_definitions(ohmsick_vst3
+
+target_include_directories(ohmsick_plugin PRIVATE src)
+target_compile_features(ohmsick_plugin PRIVATE cxx_std_17)
+target_compile_definitions(ohmsick_plugin
     PUBLIC
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
@@ -89,7 +90,7 @@ target_compile_definitions(ohmsick_vst3
     PRIVATE
         JIVE_GUI_ITEMS_HAVE_STYLE_SHEETS=1
 )
-target_link_libraries(ohmsick_vst3
+target_link_libraries(ohmsick_plugin
     PRIVATE
         hardware_backend
         ohmsick_gui_assets
@@ -121,13 +122,13 @@ target_link_libraries(debug_host
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
 )
-add_dependencies(debug_host ohmsick_vst3)
+add_dependencies(debug_host ohmsick_plugin)
 
 if(APPLE)
     # Aggregate the deliverables expected from an explicit macOS build.
     add_custom_target(ohmsick_macos
         DEPENDS
-            ohmsick_vst3
+            ohmsick_plugin
             debug_host
             hardware_parser_tests
     )
