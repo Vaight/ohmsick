@@ -103,6 +103,7 @@ private:
      * borrowed pointers to jive-created GUI components.
      */
     juce::TextEditor* deviceEditor_ = nullptr;
+    juce::Label* versionLabel_ = nullptr;
     juce::ComboBox* baudBox_ = nullptr;
     juce::TextButton* connectButton_ = nullptr;
     juce::TextButton* newMapButton_ = nullptr;

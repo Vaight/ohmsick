@@ -5,6 +5,7 @@
     <Component height="48" flex-direction="row" align-items="stretch">
         <Image id="image-logo" width="48" height="48" margin="0 0 0 0"/>
         <Component flex-grow="1"/>
+        <Label id="version-label" width="80" margin="0 8 0 0"/>
         <TextEditor id="device-editor" width="190" focusable="1"/>
         <ComboBox id="baud-box" width="90" margin="0 0 0 8">
             <Option text="9600" enabled="1"/>

@@ -39,6 +39,48 @@ Component *findComponent(jive::GuiItem &root, const juce::Identifier &id) {
     return nullptr;
 }
 
+/*
+ * read the GUI version label text from the bundled info.json metadata.
+ * PARAMS: none
+ * RETURNS:
+ *   ∟ juce::String   : info.json version string or plugin fallback version
+ */
+juce::String getVersionLabelText() {
+    const auto metadata = juce::JSON::parse(
+        juce::String::fromUTF8(BinaryData::info_json, BinaryData::info_jsonSize)
+    );
+
+    if (auto* object = metadata.getDynamicObject()) {
+        const auto version = object -> getProperty("version").toString().trim();
+        if (version.isNotEmpty()) {
+            return version;
+        }
+    }
+
+    return JucePlugin_VersionString;
+}
+
+/*
+ * read the GUI version flag label text from the bundled info.json metadata.
+ * PARAMS: none
+ * RETURNS:
+ *   ∟ juce::String   : info.json version string or plugin fallback version
+ */
+juce::String getVersionFlagLabelText() {
+    const auto metadata = juce::JSON::parse(
+        juce::String::fromUTF8(BinaryData::info_json, BinaryData::info_jsonSize)
+    );
+
+    if (auto* object = metadata.getDynamicObject()) {
+        const auto flag = object -> getProperty("version_flag").toString().trim();
+        if (flag.isNotEmpty()) {
+            return flag;
+        }
+    }
+
+    return "";
+}
+
 } // end namespace
 
 /*
@@ -330,6 +372,7 @@ HardwareControlAudioProcessorEditor::HardwareControlAudioProcessorEditor(
 
     // get necessary components from the tree using their identifiers
     deviceEditor_  = findComponent<juce::TextEditor>(*layout_, "device-editor");
+    versionLabel_  = findComponent<juce::Label>(*layout_, "version-label");
     baudBox_       = findComponent<juce::ComboBox>(*layout_, "baud-box");
     connectButton_ = findComponent<juce::TextButton>(*layout_, "connect-button");
     newMapButton_  = findComponent<juce::TextButton>(*layout_, "new-map-button");
@@ -338,14 +381,16 @@ HardwareControlAudioProcessorEditor::HardwareControlAudioProcessorEditor(
     // all components are not null; successful component locating (assertion builds)
     jassert(
         deviceEditor_  != nullptr &&
+        versionLabel_  != nullptr &&
         baudBox_       != nullptr &&
         connectButton_ != nullptr &&
         newMapButton_  != nullptr &&
         mappingStrip_  != nullptr
     );
-
     // define placeholder text for TextEditor boxes
     deviceEditor_  -> setTextToShowWhenEmpty("COM3 or /dev/ttyACM0", juce::Colours::grey);
+    versionLabel_  -> setText("ohmsick " + getVersionLabelText() + "-" + getVersionFlagLabelText(), juce::dontSendNotification);
+    versionLabel_  -> setJustificationType(juce::Justification::centred);
     // set button text directly because jive maps button text to title internally
     newMapButton_  -> setButtonText("+");
     // define button action calls
