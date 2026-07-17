@@ -20,66 +20,135 @@
  */
 class HardwareControlAudioProcessor final : public juce::AudioProcessor {
 public:
-    // MIDI channel and first controller number assigned to hardware input slots.
+    /*
+     * MIDI routing constants for generated controller events.
+     */
     static constexpr int midiChannel = 1;
     static constexpr int firstMidiCc = 1;
 
-    // Construct the processor, load serial configuration, and start serial I/O
-    // when the loaded configuration is enabled.
+    /*
+     * construct the processor, load serial configuration, and start serial I/O
+     * when the loaded configuration is enabled.
+     * PARAMS: none
+     * RETURNS: none
+     */
     HardwareControlAudioProcessor();
 
-    // Stop and join the serial worker thread before processor destruction.
+    /*
+     * stop and join the serial worker before processor destruction.
+     * PARAMS: none
+     * RETURNS: none
+     */
     ~HardwareControlAudioProcessor() override;
 
-    // juce::AudioProcessor identity and MIDI capability declarations.
+    /*
+     * juce::AudioProcessor identity and MIDI capability declarations.
+     */
     const juce::String getName() const override;
     bool acceptsMidi() const override;
     bool producesMidi() const override;
     bool isMidiEffect() const override;
     double getTailLengthSeconds() const override;
 
-    // JUCE program interface. This processor exposes one fixed, unnamed program.
+    /*
+     * juce program interface.
+     * this processor exposes one fixed, unnamed program.
+     */
     int getNumPrograms() override;
     int getCurrentProgram() override;
     void setCurrentProgram(int index) override;
     const juce::String getProgramName(int index) override;
     void changeProgramName(int index, const juce::String& newName) override;
 
-    // JUCE playback lifecycle and audio/MIDI processing callbacks.
+    /*
+     * juce playback lifecycle and audio/MIDI processing callbacks.
+     */
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
     void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) override;
 
-    // JUCE editor availability and construction.
+    /*
+     * juce editor availability and construction.
+     */
     bool hasEditor() const override;
     juce::AudioProcessorEditor* createEditor() override;
 
-    // Serialize and restore the current serial configuration in plugin state.
+    /*
+     * serialize and restore the current serial configuration in plugin state.
+     */
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
-    // User-configurable serial connection settings.
+    /*
+     * user-configurable serial connection settings.
+     */
     struct SerialConfig {
         bool enabled = false;
         juce::String device;
         int baud = 19200;
     };
 
-    // Thread-safe serial configuration and connection interface.
+    /*
+     * get the current serial configuration.
+     * PARAMS: none
+     * RETURNS:
+     *   ∟ SerialConfig   : thread-safe copy of the serial config
+     */
     SerialConfig getSerialConfig() const;
+
+    /*
+     * replace the current serial configuration.
+     * PARAMS:
+     *   ∟ SerialConfig config   : new serial config to store
+     * RETURNS: none
+     */
     void setSerialConfig(SerialConfig config);
+
+    /*
+     * connect to a serial device using the provided settings.
+     * PARAMS:
+     *   ∟ juce::String device   : serial device path or port name
+     *   ∟ int baud              : requested baud rate
+     * RETURNS: none
+     */
     void connectSerial(juce::String device, int baud);
+
+    /*
+     * disconnect from the current serial device.
+     * PARAMS: none
+     * RETURNS: none
+     */
     void disconnectSerial();
+
+    /*
+     * get the current serial connection status.
+     * PARAMS: none
+     * RETURNS:
+     *   ∟ bool   : true when serial is connected
+     */
     bool isSerialConnected() const;
 
-    // Return all queued serial status lines and clear the shared log queue.
+    /*
+     * return all queued serial status lines and clear the shared log queue.
+     * PARAMS: none
+     * RETURNS:
+     *   ∟ juce::StringArray   : drained serial log lines
+     */
     juce::StringArray drainSerialLogLines();
 
-    // Validate and queue a hardware assignment command for serial transmission.
+    /*
+     * validate and queue a hardware assignment command for serial transmission.
+     * PARAMS:
+     *   ∟ int pin      : hardware pin to assign
+     *   ∟ int action   : firmware assignment action id
+     * RETURNS: none
+     */
     void sendAssignmentCommand(int pin, int action);
 
-    // Immutable GUI-facing view of one hardware input slot.
+    /*
+     * immutable GUI-facing view of one hardware input slot.
+     */
     struct InputSnapshot {
         bool active = false;
         hardware::Kind kind = hardware::Kind::Pot;
@@ -89,61 +158,109 @@ public:
         int midiValue = 0;
     };
 
-    // Build a point-in-time view of every input slot from atomic processor state.
+    /*
+     * build a point-in-time view of every input slot from atomic processor state.
+     * PARAMS: none
+     * RETURNS:
+     *   ∟ std::array<InputSnapshot, maxInputSlots>   : slot snapshots
+     */
     std::array<InputSnapshot, hardware::maxInputSlots> getInputSnapshots() const;
 
-    // Assignment accepted during the current processor session.
+    /*
+     * assignment accepted during the current processor session.
+     */
     struct SessionMapping {
         int pin = 0;
         int action = 0;
     };
 
-    // Return a thread-safe copy of the current session mappings.
+    /*
+     * return a thread-safe copy of the current session mappings.
+     * PARAMS: none
+     * RETURNS:
+     *   ∟ std::vector<SessionMapping>   : current session mappings
+     */
     std::vector<SessionMapping> getSessionMappings() const;
 
+    /*
+     * get the session mapping revision counter.
+     * PARAMS: none
+     * RETURNS:
+     *   ∟ int   : mapping revision id for GUI refresh checks
+     */
+    int getSessionMappingsRevision() const;
+
 private:
-    // Load the process-wide serial defaults from the platform config file.
+    /*
+     * load the process-wide serial defaults from the platform config file.
+     * PARAMS: none
+     * RETURNS:
+     *   ∟ SerialConfig   : loaded or default serial config
+     */
     static SerialConfig loadSerialConfig();
 
-    // Serial worker lifecycle and worker-thread entry point.
+    /*
+     * serial worker lifecycle and worker-thread entry point.
+     */
     void startSerialThread();
     void stopSerialThread();
     void serialThreadMain(SerialConfig config);
 
-    // Thread-safe queues shared by the GUI and serial worker.
+    /*
+     * thread-safe queues shared by the GUI and serial worker.
+     */
     void pushSerialLogLine(const juce::String& line);
     std::vector<std::string> drainOutgoingSerialLines();
 
-    // Add, replace, or remove a mapping in the current in-memory session.
+    /*
+     * add, replace, remove, or clear mappings in the current in-memory session.
+     */
     void updateSessionMapping(int pin, int action);
+    void replaceSessionMappingsFromFrame(const hardware::Frame& frame);
+    void clearSessionMappings();
 
-    // Mutex-protected connection configuration.
+    /*
+     * mutex-protected connection configuration.
+     */
     SerialConfig serialConfig_;
     mutable std::mutex serialConfigMutex_;
 
-    // Serial worker lifecycle state.
+    /*
+     * serial worker lifecycle state.
+     */
     std::atomic<bool> stopSerialThread_ { false };
     std::atomic<bool> connected_ { false };
     std::thread serialThread_;
 
-    // Bounded serial status queue consumed by the GUI.
+    /*
+     * bounded serial status queue consumed by the GUI.
+     */
     std::mutex serialLogMutex_;
     std::deque<juce::String> serialLogLines_;
 
-    // Assignment-command queue consumed by the serial worker.
+    /*
+     * assignment-command queue consumed by the serial worker.
+     */
     std::mutex outgoingSerialMutex_;
     std::deque<std::string> outgoingSerialLines_;
 
-    // GUI-visible mappings accepted during this processor session.
+    /*
+     * GUI-visible mappings accepted during this processor session.
+     */
     mutable std::mutex sessionMappingsMutex_;
     std::vector<SessionMapping> sessionMappings_;
+    std::atomic<int> sessionMappingsRevision_ { 0 };
 
-    // Per-slot state written by the serial thread and read by the audio thread.
+    /*
+     * per-slot state written by the serial thread and read by the audio thread.
+     */
     std::array<std::atomic<float>, hardware::maxInputSlots> targetValues_ {};
     std::array<std::atomic<int>, hardware::maxInputSlots> targetKinds_ {};
     std::array<std::atomic<bool>, hardware::maxInputSlots> targetHasValue_ {};
 
-    // Per-slot MIDI history used to suppress duplicate controller events.
+    /*
+     * per-slot MIDI history used to suppress duplicate controller events.
+     */
     std::array<std::atomic<int>, hardware::maxInputSlots> lastSentCcValues_ {};
     std::array<std::atomic<bool>, hardware::maxInputSlots> hasSentCcValues_ {};
 

@@ -133,9 +133,10 @@ HardwareControlAudioProcessorEditor::HardwareControlAudioProcessorEditor(
     baudBox_       -> setText(juce::String(config.baud), juce::dontSendNotification);
 
     // update the gui
+    renderSessionMappingsIfChanged();
     updateConnectionState();
     
-    // start a 20hz timer
+    // start a 20hz interval timer
     startTimerHz(20);
 }
 
@@ -202,7 +203,7 @@ void HardwareControlAudioProcessorEditor::sendMapping() {
     // tells the processor to queue an assignment command
     processor_.sendAssignmentCommand(pin, action);
     // update the gui
-    renderSessionMappings();
+    renderSessionMappingsIfChanged();
 }
 
 /*
@@ -267,7 +268,7 @@ void HardwareControlAudioProcessorEditor::timerCallback() {
     }
 
     // update gui
-    renderSessionMappings();
+    renderSessionMappingsIfChanged();
     updateConnectionState();
 }
 
@@ -322,4 +323,20 @@ void HardwareControlAudioProcessorEditor::renderSessionMappings() {
         mappingsView_ -> setText(nextText, false);
         lastMappingsText_ = nextText;
     }
+}
+
+/*
+ * juce gui method for rendering mappings only after a processor revision change.
+ * PARAMS: none
+ * RETURNS:
+ *   ∟ void
+ */
+void HardwareControlAudioProcessorEditor::renderSessionMappingsIfChanged() {
+    const int revision = processor_.getSessionMappingsRevision();
+    if (revision == lastMappingsRevision_) {
+        return;
+    }
+
+    lastMappingsRevision_ = revision;
+    renderSessionMappings();
 }
