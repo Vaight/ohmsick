@@ -1,11 +1,13 @@
 # <p align="center"><img align="center" height="48" src="ASSETS/ohmsick3d.svg" alt="Logo"></p>
 <!-- data placeholders -->
 <p align="center">
-    Version: <b>0.2.0 EXP</b>
+    Version: <b>0.2.1 EXP</b>
     &nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp;
     Branch: <b>main</b>
     &nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp;
-    Release: <b>Experimental</b>
+    Release: <b>Build Only</b>
+    <br>
+    <b><i>THIS PROJECT IS NOT STABLE AND IS UNDER EXPERIMENTAL DEVELOPMENT!!!!</i></b>
 </p>
 <b>Ohmsick</b> (a play on the word homesick) is a compatibility layer between microcontrollers like Arduinos and VST3 host applications.
 <br><br>
