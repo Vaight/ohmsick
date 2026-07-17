@@ -125,8 +125,9 @@ HardwareControlAudioProcessor::HardwareControlAudioProcessor() :
 {
     // iterate over the maximum hardware input slots
     for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
-        // 
+        // initialize slot state before any serial frame has reported a pin/value
         targetValues_[slot].store(0.0f);
+        targetPins_[slot].store(-1);
         targetKinds_[slot].store(static_cast<int>(hardware::Kind::Pot));
         targetHasValue_[slot].store(false);
         lastSentCcValues_[slot].store(-1);
@@ -451,6 +452,7 @@ void HardwareControlAudioProcessor::connectSerial(juce::String device, int baud)
     if (config.enabled) {
         for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
             targetHasValue_[slot].store(false);
+            targetPins_[slot].store(-1);
             lastSentCcValues_[slot].store(-1);
             hasSentCcValues_[slot].store(false);
         }
@@ -547,6 +549,7 @@ HardwareControlAudioProcessor::getInputSnapshots() const {
     for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
         auto& snapshot = snapshots[static_cast<size_t>(slot)];
         snapshot.active = targetHasValue_[slot].load();
+        snapshot.pin = targetPins_[slot].load();
         snapshot.kind = static_cast<hardware::Kind>(targetKinds_[slot].load());
         snapshot.normalizedValue = clamp01(targetValues_[slot].load());
         snapshot.midiChannel = midiChannel;
@@ -660,9 +663,12 @@ void HardwareControlAudioProcessor::serialThreadMain(SerialConfig config) {
                     loadedSessionMappingsFromSerial = true;
                 }
 
+                // collect frame-local slot state before publishing atomics for GUI/audio readers
                 std::array<float, hardware::maxInputSlots> nextValues {};
+                std::array<int, hardware::maxInputSlots> nextPins {};
                 std::array<int, hardware::maxInputSlots> nextKinds {};
                 std::array<bool, hardware::maxInputSlots> touchedSlots {};
+                nextPins.fill(-1);
                 nextKinds.fill(static_cast<int>(hardware::Kind::Pot));
 
                 for (const auto& reading : frame->readings) {
@@ -680,7 +686,9 @@ void HardwareControlAudioProcessor::serialThreadMain(SerialConfig config) {
                         nextValues[reading.slot] = value;
                     }
 
+                    // preserve the physical pin for GUI cards; MIDI generation remains slot-based
                     nextKinds[reading.slot] = static_cast<int>(kind);
+                    nextPins[reading.slot] = reading.pin;
                     touchedSlots[reading.slot] = true;
                 }
 
@@ -690,6 +698,7 @@ void HardwareControlAudioProcessor::serialThreadMain(SerialConfig config) {
                     }
 
                     targetValues_[slot].store(nextValues[slot]);
+                    targetPins_[slot].store(nextPins[slot]);
                     targetKinds_[slot].store(nextKinds[slot]);
                     targetHasValue_[slot].store(true);
                 }

@@ -39,6 +39,7 @@ public:
     void resized() override;
 
 private:
+    class MappingStripComponent;
 
     /*
      * connect or disconnect serial based on the current processor state.
@@ -48,11 +49,20 @@ private:
     void toggleConnection();
 
     /*
-     * send the selected pin/action assignment to the processor.
+     * show a simple dialog for adding a new mapping.
      * PARAMS: none
      * RETURNS: none
      */
-    void sendMapping();
+    void showNewMappingDialog();
+
+    /*
+     * send a pin/action assignment to the processor.
+     * PARAMS:
+     *   ∟ int pin      : hardware pin to assign
+     *   ∟ int action   : firmware assignment action id
+     * RETURNS: none
+     */
+    void sendMapping(int pin, int action);
 
     /*
      * refresh connection controls and status text.
@@ -69,12 +79,11 @@ private:
     void timerCallback() override;
 
     /*
-     * count currently active hardware input slots.
+     * update mapping card values from the latest input snapshots.
      * PARAMS: none
-     * RETURNS:
-     *   ∟ int   : active hardware input count
+     * RETURNS: none
      */
-    int countActiveInputs() const;
+    void updateMappingValues();
 
     /*
      * render session mappings only when the processor revision has changed.
@@ -82,13 +91,6 @@ private:
      * RETURNS: none
      */
     void renderSessionMappingsIfChanged();
-
-    /*
-     * render the current session mapping list into the read-only mapping view.
-     * PARAMS: none
-     * RETURNS: none
-     */
-    void renderSessionMappings();
 
     /*
      * processor reference and jive layout ownership.
@@ -103,18 +105,12 @@ private:
     juce::TextEditor* deviceEditor_ = nullptr;
     juce::ComboBox* baudBox_ = nullptr;
     juce::TextButton* connectButton_ = nullptr;
-    juce::Label* statusLabel_ = nullptr;
-    juce::TextEditor* pinEditor_ = nullptr;
-    juce::ComboBox* typeBox_ = nullptr;
-    juce::TextButton* sendButton_ = nullptr;
-    juce::TextEditor* mappingsView_ = nullptr;
-    juce::TextEditor* logView_ = nullptr;
+    juce::TextButton* newMapButton_ = nullptr;
+    MappingStripComponent* mappingStrip_ = nullptr;
 
     /*
      * cached GUI text/revision state used to avoid redundant updates.
      */
-    juce::String lastLogLine_;
-    juce::String lastMappingsText_;
     int lastMappingsRevision_ = -1;
     
 };

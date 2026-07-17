@@ -1,38 +1,23 @@
 <!-- JIVE XML LAYOUT -->
 <!-- https://github.com/ImJimmi/JIVE -->
 
-<Component width="620" height="520" padding="16" flex-direction="column">
-    <Component height="28" flex-direction="row" align-items="stretch">
-        <Text text="Device" width="56"/>
-        <TextEditor id="device-editor" width="170" focusable="1"/>
-        <Text text="Baud" width="48" margin="0 0 0 8"/>
-        <ComboBox id="baud-box" width="90">
+<Component width="620" height="180" padding="8" flex-direction="column">
+    <Component height="32" flex-direction="row" align-items="stretch">
+        <Image id="image-logo" width="24" height="24" margin="4 0 4 0"/>
+        <Component flex-grow="1"/>
+        <TextEditor id="device-editor" width="190" focusable="1"/>
+        <ComboBox id="baud-box" width="90" margin="0 0 0 8">
             <Option text="9600" enabled="1"/>
             <Option text="19200" enabled="1"/>
             <Option text="38400" enabled="1"/>
             <Option text="57600" enabled="1"/>
             <Option text="115200" enabled="1"/>
         </ComboBox>
+        <Button id="connect-button" text="Connect" width="100" margin="0 0 0 8"/>
     </Component>
 
-    <Component height="28" margin="8 0 0 0" flex-direction="row">
-        <Button id="connect-button" text="Connect" width="100"/>
-        <Label id="status-label" flex-grow="1" margin="0 0 0 10"/>
+    <Component id="mapping-panel" height="120" margin="8 0 0 0" flex-direction="row" align-items="stretch">
+        <MappingStrip id="mapping-strip" flex-grow="1"/>
+        <Button id="new-map-button" text="+" width="32" margin="0 0 0 8"/>
     </Component>
-
-    <Component height="28" margin="8 0 0 0" flex-direction="row">
-        <Text text="Pin" width="32"/>
-        <TextEditor id="pin-editor" width="70" focusable="1"/>
-        <Text text="Type" width="48" margin="0 0 0 8"/>
-        <ComboBox id="type-box" width="120" selected="1">
-            <Option text="Remove" enabled="1"/>
-            <Option text="Digital" enabled="1" selected="1"/>
-            <Option text="Pullup" enabled="1"/>
-            <Option text="Analog" enabled="1"/>
-        </ComboBox>
-        <Button id="send-button" text="Send" width="80" margin="0 0 0 8"/>
-    </Component>
-
-    <TextEditor id="mappings-view" height="110" margin="8 0 0 0"/>
-    <TextEditor id="log-view" flex-grow="1" margin="8 0 0 0"/>
 </Component>

@@ -148,9 +148,12 @@ public:
 
     /*
      * immutable GUI-facing view of one hardware input slot.
+     * pin is tracked separately from the slot so GUI mapping cards can display
+     * the latest value for the physical pin they represent.
      */
     struct InputSnapshot {
         bool active = false;
+        int pin = -1;
         hardware::Kind kind = hardware::Kind::Pot;
         float normalizedValue = 0.0f;
         int midiChannel = 1;
@@ -253,8 +256,12 @@ private:
 
     /*
      * per-slot state written by the serial thread and read by the audio thread.
+     * targetPins_ lets GUI snapshots preserve the physical pin reported by the
+     * firmware, while the value/kind arrays keep the existing slot-indexed MIDI
+     * generation path intact.
      */
     std::array<std::atomic<float>, hardware::maxInputSlots> targetValues_ {};
+    std::array<std::atomic<int>, hardware::maxInputSlots> targetPins_ {};
     std::array<std::atomic<int>, hardware::maxInputSlots> targetKinds_ {};
     std::array<std::atomic<bool>, hardware::maxInputSlots> targetHasValue_ {};
 
