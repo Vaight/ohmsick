@@ -4,14 +4,14 @@
 <Component width="620" height="520" padding="16" flex-direction="column">
     <Component height="28" flex-direction="row" align-items="stretch">
         <Text text="Device" width="56"/>
-        <TextEditor id="device-editor" width="170"/>
+        <TextEditor id="device-editor" width="170" focusable="1"/>
         <Text text="Baud" width="48" margin="0 0 0 8"/>
         <ComboBox id="baud-box" width="90">
-            <Option text="9600"/>
-            <Option text="19200"/>
-            <Option text="38400"/>
-            <Option text="57600"/>
-            <Option text="115200"/>
+            <Option text="9600" enabled="1"/>
+            <Option text="19200" enabled="1"/>
+            <Option text="38400" enabled="1"/>
+            <Option text="57600" enabled="1"/>
+            <Option text="115200" enabled="1"/>
         </ComboBox>
     </Component>
 
@@ -22,13 +22,13 @@
 
     <Component height="28" margin="8 0 0 0" flex-direction="row">
         <Text text="Pin" width="32"/>
-        <TextEditor id="pin-editor" width="70"/>
+        <TextEditor id="pin-editor" width="70" focusable="1"/>
         <Text text="Type" width="48" margin="0 0 0 8"/>
         <ComboBox id="type-box" width="120" selected="1">
-            <Option text="Remove"/>
-            <Option text="Digital" selected="1"/>
-            <Option text="Pullup"/>
-            <Option text="Analog"/>
+            <Option text="Remove" enabled="1"/>
+            <Option text="Digital" enabled="1" selected="1"/>
+            <Option text="Pullup" enabled="1"/>
+            <Option text="Analog" enabled="1"/>
         </ComboBox>
         <Button id="send-button" text="Send" width="80" margin="0 0 0 8"/>
     </Component>
