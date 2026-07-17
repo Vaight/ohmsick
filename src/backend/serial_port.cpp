@@ -15,7 +15,9 @@
         #define NOMINMAX
     #endif
     #include <windows.h>
+
 #else // ----- NON-WINDOWS TARGET --------------------------------------------------------------------
+
     #include <cstring>
     #include <fcntl.h>
     #include <termios.h>
