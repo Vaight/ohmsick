@@ -205,28 +205,26 @@ private:
     };
 
     /*
-     * format the latest snapshot value for one mapped pin.
+     * format the latest MIDI value for one mapped pin.
      * PARAMS:
      *   ∟ int pin                                      : physical pin to look up
      *   ∟ int action                                   : mapping action type
      *   ∟ std::array<InputSnapshot, maxInputSlots>& snapshots   : current slot state
      * RETURNS:
-     *   ∟ juce::String   : visible value text or "--" when unavailable
+     *   ∟ juce::String   : MIDI value text or "--" when unavailable
      */
     static juce::String findValueForPin(
         int pin,
         int action,
         const std::array<HardwareControlAudioProcessor::InputSnapshot, hardware::maxInputSlots>& snapshots) {
+        juce::ignoreUnused(action);
+
         for (const auto& snapshot : snapshots) {
             if (!snapshot.active || snapshot.pin != pin) {
                 continue;
             }
 
-            if (action == 3) {
-                return juce::String(juce::roundToInt(snapshot.normalizedValue * 100.0f));
-            }
-
-            return snapshot.normalizedValue >= 0.5f ? "1" : "0";
+            return juce::String(snapshot.midiValue);
         }
 
         return "--";
