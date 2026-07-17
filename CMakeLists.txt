@@ -70,6 +70,7 @@ juce_add_plugin(ohmsick_vst3
 juce_add_binary_data(ohmsick_gui_assets
     SOURCES
         src/vst3/gui/layout.xml
+        src/vst3/gui/ohm.png
 )
 
 target_sources(ohmsick_vst3 PRIVATE
