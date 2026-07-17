@@ -53,13 +53,17 @@ cmake --build build
 The compiled <b>VST3</b> is currently found at...
 
 ```
-build-$target$/ohmsick_vst3_artefacts/Release/VST3/Ohmsick.vst
+build-$target$/ohmsick_vst3_artefacts/Release/VST3/Ohmsick.vst3
+or
+build-$target$/ohmsick_vst3_artefacts/Debug/VST3/Ohmsick.vst3
 ```
 
-Included in this project is a really small VST3 debug host application. This currently can be found at...
+Included in this project is a really small VST3 debug host application. (this is simply for testing GUI and serial functionality) This currently can be found at...
 
 ```
 build-$target$/debug_host_artefacts/Release/Ohmsick Debug Host
+or
+build-$target$/debug_host_artefacts/Debug/Ohmsick Debug Host
 ```
 
 <br><br>
