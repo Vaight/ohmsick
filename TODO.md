@@ -1,7 +1,8 @@
 # TO-DO / TIMELINE
 
-- <i>v0.2.2</i> : <b>On-The-Fly Data Modification</b> <i><b><-- IN-PROGRESS</b></i>
-    - Analog Noise Suppression (Dynamic remap based on average values).
+- <i>v0.2.2</i> : <b>On-The-Fly Data Modification</b>
+    - <s>Change I/O ownership to the backend instead of the plugin.</s>
+    - Analog Noise Correction (Dynamic remap based on average values).
     - Inversion (Map range `0-127` to `127-0` and vice versa).
     - Arbutrary Remap (Map range `0-127` to `A-B` where `0 < A,B < 127` and `A < B`).
     - Data Toggle (Toggle between `0` and `127` from a digital input; button to switch).
