@@ -9,7 +9,6 @@
 
 namespace {
 
-constexpr float potSmoothingAlpha = 0.25f;
 constexpr int removeAssignmentAction = 0;
 constexpr int digitalAssignmentAction = 1;
 constexpr int pullupAssignmentAction = 2;
@@ -125,11 +124,6 @@ HardwareControlAudioProcessor::HardwareControlAudioProcessor() :
 {
     // iterate over the maximum hardware input slots
     for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
-        // initialize slot state before any serial frame has reported a pin/value
-        targetValues_[slot].store(0.0f);
-        targetPins_[slot].store(-1);
-        targetKinds_[slot].store(static_cast<int>(hardware::Kind::Pot));
-        targetHasValue_[slot].store(false);
         lastSentCcValues_[slot].store(-1);
         hasSentCcValues_[slot].store(false);
     }
@@ -293,15 +287,14 @@ void HardwareControlAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
     buffer.clear();
 
     for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
-        if (!targetHasValue_[slot].load()) {
+        const auto input = dataProcessor_.getInputBySlot(slot);
+        if (!input.active) {
             continue;
         }
 
-        const auto kind = static_cast<hardware::Kind>(targetKinds_[slot].load());
-        const float value = clamp01(targetValues_[slot].load());
-        const int midiValue = kind == hardware::Kind::Button
-            ? (value >= 0.5f ? 127 : 0)
-            : normalizedToMidiValue(value);
+        const int midiValue = input.kind == hardware::Kind::Button
+            ? (input.normalizedValue >= 0.5f ? 127 : 0)
+            : normalizedToMidiValue(input.normalizedValue);
 
         if (!hasSentCcValues_[slot].load() || midiValue != lastSentCcValues_[slot].load()) {
             midiMessages.addEvent(
@@ -450,9 +443,8 @@ void HardwareControlAudioProcessor::connectSerial(juce::String device, int baud)
     setSerialConfig(config);
 
     if (config.enabled) {
+        dataProcessor_.reset();
         for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
-            targetHasValue_[slot].store(false);
-            targetPins_[slot].store(-1);
             lastSentCcValues_[slot].store(-1);
             hasSentCcValues_[slot].store(false);
         }
@@ -545,13 +537,15 @@ void HardwareControlAudioProcessor::sendAssignmentCommand(int pin, int action) {
 std::array<HardwareControlAudioProcessor::InputSnapshot, hardware::maxInputSlots>
 HardwareControlAudioProcessor::getInputSnapshots() const {
     std::array<InputSnapshot, hardware::maxInputSlots> snapshots {};
+    const auto inputs = dataProcessor_.getInputs();
 
     for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
+        const auto& input = inputs[static_cast<size_t>(slot)];
         auto& snapshot = snapshots[static_cast<size_t>(slot)];
-        snapshot.active = targetHasValue_[slot].load();
-        snapshot.pin = targetPins_[slot].load();
-        snapshot.kind = static_cast<hardware::Kind>(targetKinds_[slot].load());
-        snapshot.normalizedValue = clamp01(targetValues_[slot].load());
+        snapshot.active = input.active;
+        snapshot.pin = input.pin;
+        snapshot.kind = input.kind;
+        snapshot.normalizedValue = clamp01(input.normalizedValue);
         snapshot.midiChannel = midiChannel;
         snapshot.midiCc = firstMidiCc + slot;
         snapshot.midiValue = snapshot.kind == hardware::Kind::Button
@@ -630,7 +624,6 @@ void HardwareControlAudioProcessor::serialThreadMain(SerialConfig config) {
         pushSerialLogLine("Connected to " + config.device);
 
         std::string serialBuffer;
-        std::array<float, hardware::maxInputSlots> smoothedValues {};
         bool loadedSessionMappingsFromSerial = false;
 
         while (!stopSerialThread_.load()) {
@@ -663,45 +656,7 @@ void HardwareControlAudioProcessor::serialThreadMain(SerialConfig config) {
                     loadedSessionMappingsFromSerial = true;
                 }
 
-                // collect frame-local slot state before publishing atomics for GUI/audio readers
-                std::array<float, hardware::maxInputSlots> nextValues {};
-                std::array<int, hardware::maxInputSlots> nextPins {};
-                std::array<int, hardware::maxInputSlots> nextKinds {};
-                std::array<bool, hardware::maxInputSlots> touchedSlots {};
-                nextPins.fill(-1);
-                nextKinds.fill(static_cast<int>(hardware::Kind::Pot));
-
-                for (const auto& reading : frame->readings) {
-                    if (reading.slot < 0 || reading.slot >= hardware::maxInputSlots) {
-                        continue;
-                    }
-
-                    const auto kind = reading.kind;
-                    const float value = clamp01(reading.normalizedValue);
-                    if (kind == hardware::Kind::Pot) {
-                        smoothedValues[reading.slot] += potSmoothingAlpha * (value - smoothedValues[reading.slot]);
-                        nextValues[reading.slot] = smoothedValues[reading.slot];
-                    } else {
-                        smoothedValues[reading.slot] = value;
-                        nextValues[reading.slot] = value;
-                    }
-
-                    // preserve the physical pin for GUI cards; MIDI generation remains slot-based
-                    nextKinds[reading.slot] = static_cast<int>(kind);
-                    nextPins[reading.slot] = reading.pin;
-                    touchedSlots[reading.slot] = true;
-                }
-
-                for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
-                    if (!touchedSlots[slot]) {
-                        continue;
-                    }
-
-                    targetValues_[slot].store(nextValues[slot]);
-                    targetPins_[slot].store(nextPins[slot]);
-                    targetKinds_[slot].store(nextKinds[slot]);
-                    targetHasValue_[slot].store(true);
-                }
+                dataProcessor_.applyFrame(*frame);
             }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(5));

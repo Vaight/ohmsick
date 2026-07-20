@@ -32,6 +32,8 @@ FetchContent_MakeAvailable(JIVE)
 
 add_library(hardware_backend STATIC
     src/backend.h
+    src/backend/data_processor.cpp
+    src/backend/data_processor.h
     src/backend/protocol.cpp
     src/backend/protocol.h
     src/backend/serial_port.cpp

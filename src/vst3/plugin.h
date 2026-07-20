@@ -255,15 +255,10 @@ private:
     std::atomic<int> sessionMappingsRevision_ { 0 };
 
     /*
-     * per-slot state written by the serial thread and read by the audio thread.
-     * targetPins_ lets GUI snapshots preserve the physical pin reported by the
-     * firmware, while the value/kind arrays keep the existing slot-indexed MIDI
-     * generation path intact.
+     * backend-owned input state written by the serial thread and read by the
+     * GUI/audio threads.
      */
-    std::array<std::atomic<float>, hardware::maxInputSlots> targetValues_ {};
-    std::array<std::atomic<int>, hardware::maxInputSlots> targetPins_ {};
-    std::array<std::atomic<int>, hardware::maxInputSlots> targetKinds_ {};
-    std::array<std::atomic<bool>, hardware::maxInputSlots> targetHasValue_ {};
+    hardware::DataProcessor dataProcessor_;
 
     /*
      * per-slot MIDI history used to suppress duplicate controller events.
