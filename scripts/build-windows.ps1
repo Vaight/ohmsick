@@ -38,7 +38,7 @@ if (-not [string]::IsNullOrWhiteSpace($Target)) {
 
 cmake @buildArgs
 
-$vst3Path = Join-Path $BuildDir "ohmsick_vst3_artefacts\$Config\VST3\Ohmsick.vst3"
+$vst3Path = Join-Path $BuildDir "ohmsick_plugin_artefacts\$Config\VST3\Ohmsick.vst3"
 if (Test-Path $vst3Path) {
     Write-Host "Built VST3: $vst3Path"
 }
