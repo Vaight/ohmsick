@@ -3,7 +3,7 @@
 <p align="center">
     Version: <b>0.2.2 EXP</b>
     &nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp;
-    Branch: <b>main</b>
+    Branch: <b>v0.2.2-DEV</b>
     &nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp;
     Release: <b>Experimental</b>
 </p>
