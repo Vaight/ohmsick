@@ -1,6 +1,6 @@
 # TO-DO / TIMELINE
 
-- <i>v0.2.2</i> : <b>On-The-Fly Data Modification</b>
+- <i>v0.2.2</i> : <b>On-The-Fly Data Modification</b> <i><b><-- IN-PROGRESS</b></i>
     - Analog Noise Suppression (Dynamic remap based on average values).
     - Inversion (Map range `0-127` to `127-0` and vice versa).
     - Arbutrary Remap (Map range `0-127` to `A-B` where `0 < A,B < 127` and `A < B`).
