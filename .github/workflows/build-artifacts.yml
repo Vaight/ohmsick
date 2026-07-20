@@ -77,7 +77,7 @@ jobs:
         shell: bash
         run: |
           chmod +x scripts/build-linux.sh
-          TARGET=ohmsick_vst3_VST3 ./scripts/build-linux.sh
+          TARGET=ohmsick_plugin_VST3 ./scripts/build-linux.sh
           cmake --build build-linux --target hardware_parser_tests --parallel "$(nproc)"
           ./build-linux/hardware_parser_tests
 
@@ -93,7 +93,15 @@ jobs:
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
-          ./scripts/build-windows.ps1 -Generator "Visual Studio 17 2022" -Target ohmsick_vst3_VST3
+          $cmakeHelp = cmake --help
+          if ($cmakeHelp -match "Visual Studio 18 2026") {
+            $generator = "Visual Studio 18 2026"
+          } elseif ($cmakeHelp -match "Visual Studio 17 2022") {
+            $generator = "Visual Studio 17 2022"
+          } else {
+            throw "No supported Visual Studio CMake generator was found on this runner."
+          }
+          ./scripts/build-windows.ps1 -Generator $generator -Target ohmsick_plugin_VST3
           cmake --build build-windows --config Release --target hardware_parser_tests
           ./build-windows/Release/hardware_parser_tests.exe
 
@@ -102,24 +110,42 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cd build-linux/ohmsick_vst3_artefacts/Release/VST3
-          zip -r "$GITHUB_WORKSPACE/dist/ohmsick-linux-vst3.zip" "Ohmsick.vst3"
+          vst3_path="$(find build-linux -type d -path '*/VST3/Ohmsick.vst3' -print -quit)"
+          if [[ -z "$vst3_path" ]]; then
+            echo "Could not find Linux Ohmsick.vst3 under build-linux."
+            find build-linux -maxdepth 5 -type d -name '*artefacts' -print
+            exit 1
+          fi
+          parent_dir="$(dirname "$vst3_path")"
+          (cd "$parent_dir" && zip -r "$GITHUB_WORKSPACE/dist/ohmsick-linux-vst3.zip" "Ohmsick.vst3")
+          ls -la dist
 
       - name: Package macOS artifacts
         if: matrix.platform == 'macos'
         shell: zsh {0}
         run: |
           mkdir -p dist
-          if [[ -d "build-macos/ohmsick_vst3_artefacts/Release/VST3/Ohmsick.vst3" ]]; then
+          vst3_path="$(find build-macos -type d -path '*/VST3/Ohmsick.vst3' -print -quit)"
+          au_path="$(find build-macos -type d -path '*/AU/Ohmsick.component' -print -quit)"
+
+          if [[ -n "$vst3_path" ]]; then
             ditto -c -k --keepParent \
-              "build-macos/ohmsick_vst3_artefacts/Release/VST3/Ohmsick.vst3" \
+              "$vst3_path" \
               "dist/ohmsick-macos-vst3.zip"
           fi
-          if [[ -d "build-macos/ohmsick_vst3_artefacts/Release/AU/Ohmsick.component" ]]; then
+
+          if [[ -n "$au_path" ]]; then
             ditto -c -k --keepParent \
-              "build-macos/ohmsick_vst3_artefacts/Release/AU/Ohmsick.component" \
+              "$au_path" \
               "dist/ohmsick-macos-au.zip"
           fi
+
+          if ! ls dist/*.zip >/dev/null 2>&1; then
+            echo "Could not find macOS plugin artifacts under build-macos."
+            find build-macos -maxdepth 5 -type d -name '*artefacts' -print
+            exit 1
+          fi
+
           ls -la dist
 
       - name: Package Windows artifacts
@@ -127,8 +153,18 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $vst3Path = Get-ChildItem -Path build-windows -Directory -Recurse -Filter "Ohmsick.vst3" |
+            Where-Object { $_.FullName -match "\\VST3\\Ohmsick\.vst3$" } |
+            Select-Object -First 1
+
+          if ($null -eq $vst3Path) {
+            Write-Host "Could not find Windows Ohmsick.vst3 under build-windows."
+            Get-ChildItem -Path build-windows -Directory -Recurse -Filter "*artefacts" | Select-Object FullName
+            exit 1
+          }
+
           Compress-Archive `
-            -Path "build-windows/ohmsick_vst3_artefacts/Release/VST3/Ohmsick.vst3" `
+            -Path $vst3Path.FullName `
             -DestinationPath "dist/ohmsick-windows-vst3.zip" `
             -Force
           Get-ChildItem dist
