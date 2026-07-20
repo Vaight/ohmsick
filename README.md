@@ -1,13 +1,11 @@
 # <p align="center"><img align="center" height="48" src="ASSETS/ohmsick3d.svg" alt="Logo"></p>
 <!-- data placeholders -->
 <p align="center">
-    Version: <b>0.2.0 EXP</b>
+    Version: <b>0.2.1 EXP</b>
     &nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp;
     Branch: <b>main</b>
     &nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp;
     Release: <b>Experimental</b>
-    <br>
-    <b><i>THIS PROJECT IS NOT STABLE AND IS UNDER EXPERIMENTAL DEVELOPMENT!!!!</i></b>
 </p>
 <b>Ohmsick</b> (a play on the word homesick) is a compatibility layer between microcontrollers like Arduinos and VST3 host applications.
 <br><br>
@@ -120,6 +118,14 @@ Currently the tested boards are as follows:
 | - | - |
 | Arduino Uno (ATmega328P) | Successful |
 | Arduino Nano (ATmega328P) | Successful |
+
+<br><br>
+
+# Tested Host Applications
+Currently the tested applications are as follows:
+| Application / DAW | Type | Status |
+| - | - | - |
+| Ableton Live | VST3 | Successful |
 
 <br><br>
 
