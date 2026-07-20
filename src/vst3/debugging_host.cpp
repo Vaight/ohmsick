@@ -32,8 +32,6 @@ juce::Array<juce::File> pluginSearchRoots() {
 
 /* 
  * this method finds the built juce vst3 artefact in the given root directories.
- * if the artefact directory changes, please change the hard-coded values here.
- * it may be a good idea to add a --path flag to the cli.
  * PARAMS: none
  * RETURNS:
  *   ∟ juce::File   : the plugin artefact
@@ -45,11 +43,11 @@ juce::File findPluginArtefact() {
         const juce::Array<juce::File> candidates {
             root.getChildFile(pluginName),
             root.getChildFile("VST3").getChildFile(pluginName),
-            root.getChildFile("ohmsick_vst3_artefacts").getChildFile("VST3").getChildFile(pluginName),
-            root.getChildFile("ohmsick_vst3_artefacts").getChildFile("Debug").getChildFile("VST3").getChildFile(pluginName),
-            root.getChildFile("ohmsick_vst3_artefacts").getChildFile("Release").getChildFile("VST3").getChildFile(pluginName),
-            root.getChildFile("ohmsick_vst3_artefacts").getChildFile("RelWithDebInfo").getChildFile("VST3").getChildFile(pluginName),
-            root.getChildFile("ohmsick_vst3_artefacts").getChildFile("MinSizeRel").getChildFile("VST3").getChildFile(pluginName),
+            root.getChildFile("ohmsick_plugin_artefacts").getChildFile("VST3").getChildFile(pluginName),
+            root.getChildFile("ohmsick_plugin_artefacts").getChildFile("Debug").getChildFile("VST3").getChildFile(pluginName),
+            root.getChildFile("ohmsick_plugin_artefacts").getChildFile("Release").getChildFile("VST3").getChildFile(pluginName),
+            root.getChildFile("ohmsick_plugin_artefacts").getChildFile("RelWithDebInfo").getChildFile("VST3").getChildFile(pluginName),
+            root.getChildFile("ohmsick_plugin_artefacts").getChildFile("MinSizeRel").getChildFile("VST3").getChildFile(pluginName),
         };
 
         for (const auto& candidate : candidates) {

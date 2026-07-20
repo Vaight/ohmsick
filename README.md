@@ -25,25 +25,27 @@ git clone https://github.com/Vaight/ohmsick.git
 
 Ensure <b>CMake</b> is installed on your machine and your C++ compiler of choice. If you would like to use the premade build scripts, please have <code>G++</code> or <code>Visual Studio 18 2026</code> installed.
 
-Now, ensuring you are within the folder, navigate to the <code>/scripts/</code> directory.
+From the repository root, run the build script for your platform:
 
 ```shell
-cd scripts
+./scripts/build-linux.sh
+./scripts/build-macos.zsh
+./scripts/build-windows.ps1
 ```
 
-Use the script for your current platform to execute the build!
+To build only the debug host and its required plugin, use the matching platform script:
 
 ```shell
-./build-linux.sh
-./build-macos.zsh
-./build-windows.ps1
+./scripts/build-debug-host-linux.sh
+./scripts/build-debug-host-macos.zsh
+./scripts/build-debug-host-windows.ps1
 ```
 
 If the provided scripts do not work or if you have your own build configuration, use cmake in your terminal directly. It will attempt to build the project with your current OS targets and specifications.
 
 ```shell
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
+cmake -S . -B build-$target -DCMAKE_BUILD_TYPE=Debug
+cmake --build build-$target
 ```
 
 <br><br>
@@ -51,18 +53,20 @@ cmake --build build
 The compiled <b>VST3</b> is currently found at...
 
 ```
-build-$target$/ohmsick_vst3_artefacts/Release/VST3/Ohmsick.vst3
+build-$target/ohmsick_plugin_artefacts/Release/VST3/Ohmsick.vst3
 or
-build-$target$/ohmsick_vst3_artefacts/Debug/VST3/Ohmsick.vst3
+build-$target/ohmsick_plugin_artefacts/Debug/VST3/Ohmsick.vst3
 ```
 
 Included in this project is a really small VST3 debug host application. (this is simply for testing GUI and serial functionality) This currently can be found at...
 
 ```
-build-$target$/debug_host_artefacts/Release/Ohmsick Debug Host
-or
-build-$target$/debug_host_artefacts/Debug/Ohmsick Debug Host
+build-linux/debug_host_artefacts/Release/Ohmsick Debug Host
+build-macos/debug_host_artefacts/Release/Ohmsick Debug Host.app
+build-windows/debug_host_artefacts/Release/Ohmsick Debug Host.exe
 ```
+
+On multi-config generators, replace `Release` with the selected configuration (for example, `Debug`).
 
 <br><br>
 

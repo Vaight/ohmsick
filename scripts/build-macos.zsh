@@ -35,7 +35,12 @@ cmake --build "$BUILD_DIR" \
     --parallel "$BUILD_JOBS"
 
 VST3_PATH="$BUILD_DIR/ohmsick_plugin_artefacts/$CONFIG/VST3/Ohmsick.vst3"
+DEBUG_HOST_PATH="$BUILD_DIR/debug_host_artefacts/$CONFIG/Ohmsick Debug Host.app"
 
 if [[ -d "$VST3_PATH" ]]; then
     print "Built VST3: $VST3_PATH"
+fi
+
+if [[ -d "$DEBUG_HOST_PATH" ]]; then
+    print "Built debug host: $DEBUG_HOST_PATH"
 fi

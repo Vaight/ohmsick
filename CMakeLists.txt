@@ -131,6 +131,7 @@ if(APPLE)
     add_custom_target(ohmsick_macos
         DEPENDS
             ohmsick_plugin_All
+            debug_host
             hardware_parser_tests
     )
 endif()
