@@ -128,8 +128,7 @@ if(APPLE)
     # Aggregate the deliverables expected from an explicit macOS build.
     add_custom_target(ohmsick_macos
         DEPENDS
-            ohmsick_plugin
-            debug_host
+            ohmsick_plugin_All
             hardware_parser_tests
     )
 endif()
