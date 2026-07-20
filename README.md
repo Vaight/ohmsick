@@ -1,7 +1,7 @@
 # <p align="center"><img align="center" height="48" src="ASSETS/ohmsick3d.svg" alt="Logo"></p>
 <!-- data placeholders -->
 <p align="center">
-    Version: <b>0.2.1 EXP</b>
+    Version: <b>0.2.2 EXP</b>
     &nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp;
     Branch: <b>main</b>
     &nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp;
