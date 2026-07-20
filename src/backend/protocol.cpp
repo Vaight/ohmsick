@@ -40,7 +40,7 @@ std::string_view trimLineEnding(std::string_view line) {
 
 }  // namespace
 
-namespace hardware {
+namespace backend {
 
 std::optional<Frame> parseFrame(std::string_view line) {
     line = trimLineEnding(line);
@@ -112,4 +112,4 @@ ParsedLine parseLine(const std::string& line) {
     return result;
 }
 
-}  // namespace hardware
+}  // namespace backend

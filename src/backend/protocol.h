@@ -10,7 +10,7 @@
 #include <string_view>
 #include <vector>
 
-namespace hardware {
+namespace backend {
 
 constexpr int maxInputSlots = 64;
 
@@ -40,4 +40,4 @@ std::optional<Frame> parseFrame(std::string_view line);
 std::string formatFrame(const Frame& frame);
 ParsedLine parseLine(const std::string& line);
 
-}  // namespace hardware
+}  // namespace backend

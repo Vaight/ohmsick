@@ -26,12 +26,12 @@ namespace {
      *   ∟ bool valid        : t/f if the slot is within max slots
      */
     bool isValidSlot(int slot) {
-        return slot >= 0 && slot < hardware::maxInputSlots;
+        return slot >= 0 && slot < backend::maxInputSlots;
     }
 
 }  // namespace
 
-namespace hardware {
+namespace backend {
 
     /*
      * CONSTRUCTOR DataProcessor            : prepares a processor for normalized hardware input values.
@@ -186,4 +186,4 @@ namespace hardware {
         return std::clamp(static_cast<int>(std::lround(clamp01(value) * 127.0f)), 0, 127);
     }
 
-}  // namespace hardware
+}  // namespace backend

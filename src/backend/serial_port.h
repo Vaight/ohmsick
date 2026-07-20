@@ -6,7 +6,7 @@
 #include <string>
 #include <string_view>
 
-namespace hardware {
+namespace backend {
 
 #ifdef _WIN32 // ----- WINDOWS TARGET ONLY -----------------------------------------------------------
 
@@ -30,4 +30,4 @@ void writeSerial(NativeSerialHandle serialHandle, std::string_view message);
 void sendSerialLine(NativeSerialHandle serialHandle, std::string_view message);
 void closeSerialPort(NativeSerialHandle serialHandle);
 
-}  // namespace hardware
+}  // namespace backend

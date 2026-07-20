@@ -8,7 +8,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace hardware {
+namespace backend {
 
 SerialReader::SerialReader(const std::string& device, int baud) {
     open(device, baud);
@@ -57,7 +57,7 @@ std::string SerialReader::readAvailable() const {
         return {};
     }
 
-    return hardware::readAvailable(handle_);
+    return backend::readAvailable(handle_);
 }
 
 void SerialReader::write(std::string_view message) const {
@@ -76,4 +76,4 @@ void SerialReader::sendLine(std::string_view message) const {
     sendSerialLine(handle_, message);
 }
 
-}  // namespace hardware
+}  // namespace backend

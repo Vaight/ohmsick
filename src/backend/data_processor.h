@@ -6,7 +6,7 @@
 #include <atomic>
 #include <optional>
 
-namespace hardware {
+namespace backend {
 
 constexpr float defaultInputSmoothingAlpha = 0.25f;
 
@@ -47,4 +47,4 @@ private:
 
 int normalizedToCc(float value);
 
-}  // namespace hardware
+}  // namespace backend

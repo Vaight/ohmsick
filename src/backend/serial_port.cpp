@@ -128,7 +128,7 @@ namespace {
 
 }  // namespace
 
-namespace hardware {
+namespace backend {
 
 /*
  * open and configure a native serial port for nonblocking read/write access.

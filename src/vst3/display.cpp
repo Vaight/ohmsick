@@ -150,7 +150,7 @@ public:
      * RETURNS: none
      */
     void setInputSnapshots(
-        const std::array<HardwareControlAudioProcessor::InputSnapshot, hardware::maxInputSlots>& snapshots) {
+        const std::array<HardwareControlAudioProcessor::InputSnapshot, backend::maxInputSlots>& snapshots) {
         for (auto& card : cards_) {
             card->setValue(findValueForPin(card->pin(), card->action(), snapshots));
         }
@@ -286,7 +286,7 @@ private:
     static juce::String findValueForPin(
         int pin,
         int action,
-        const std::array<HardwareControlAudioProcessor::InputSnapshot, hardware::maxInputSlots>& snapshots) {
+        const std::array<HardwareControlAudioProcessor::InputSnapshot, backend::maxInputSlots>& snapshots) {
         juce::ignoreUnused(action);
 
         for (const auto& snapshot : snapshots) {

@@ -72,17 +72,17 @@ int normalizedToMidiValue(float value) {
  * helper method to convert a parsed hardware input kind into a firmware
  * assignment action id.
  * PARAMS:
- *   ∟ hardware::Kind kind     : parsed hardware input kind from serial data
+ *   ∟ backend::Kind kind     : parsed hardware input kind from serial data
  *   ∟ int existingAction      : current action for the same pin, if any
  * RETURNS:
  *   ∟ int                     : assignment action id for GUI/session mapping
  */
-int assignmentActionForKind(hardware::Kind kind, int existingAction) {
-    if (kind == hardware::Kind::Button && existingAction == pullupAssignmentAction) {
+int assignmentActionForKind(backend::Kind kind, int existingAction) {
+    if (kind == backend::Kind::Button && existingAction == pullupAssignmentAction) {
         return pullupAssignmentAction;
     }
 
-    return kind == hardware::Kind::Pot
+    return kind == backend::Kind::Pot
         ? analogAssignmentAction
         : digitalAssignmentAction;
 }
@@ -123,7 +123,7 @@ HardwareControlAudioProcessor::HardwareControlAudioProcessor() :
     serialConfig_(loadSerialConfig())
 {
     // iterate over the maximum hardware input slots
-    for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
+    for (int slot = 0; slot < backend::maxInputSlots; ++slot) {
         lastSentCcValues_[slot].store(-1);
         hasSentCcValues_[slot].store(false);
     }
@@ -286,13 +286,13 @@ void HardwareControlAudioProcessor::processBlock(juce::AudioBuffer<float>& buffe
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
 
-    for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
+    for (int slot = 0; slot < backend::maxInputSlots; ++slot) {
         const auto input = dataProcessor_.getInputBySlot(slot);
         if (!input.active) {
             continue;
         }
 
-        const int midiValue = input.kind == hardware::Kind::Button
+        const int midiValue = input.kind == backend::Kind::Button
             ? (input.normalizedValue >= 0.5f ? 127 : 0)
             : normalizedToMidiValue(input.normalizedValue);
 
@@ -444,7 +444,7 @@ void HardwareControlAudioProcessor::connectSerial(juce::String device, int baud)
 
     if (config.enabled) {
         dataProcessor_.reset();
-        for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
+        for (int slot = 0; slot < backend::maxInputSlots; ++slot) {
             lastSentCcValues_[slot].store(-1);
             hasSentCcValues_[slot].store(false);
         }
@@ -534,12 +534,12 @@ void HardwareControlAudioProcessor::sendAssignmentCommand(int pin, int action) {
  * RETURNS:
  *   ∟ std::array<InputSnapshot, maxInputSlots>   : GUI/audio-safe slot state
  */
-std::array<HardwareControlAudioProcessor::InputSnapshot, hardware::maxInputSlots>
+std::array<HardwareControlAudioProcessor::InputSnapshot, backend::maxInputSlots>
 HardwareControlAudioProcessor::getInputSnapshots() const {
-    std::array<InputSnapshot, hardware::maxInputSlots> snapshots {};
+    std::array<InputSnapshot, backend::maxInputSlots> snapshots {};
     const auto inputs = dataProcessor_.getInputs();
 
-    for (int slot = 0; slot < hardware::maxInputSlots; ++slot) {
+    for (int slot = 0; slot < backend::maxInputSlots; ++slot) {
         const auto& input = inputs[static_cast<size_t>(slot)];
         auto& snapshot = snapshots[static_cast<size_t>(slot)];
         snapshot.active = input.active;
@@ -548,7 +548,7 @@ HardwareControlAudioProcessor::getInputSnapshots() const {
         snapshot.normalizedValue = clamp01(input.normalizedValue);
         snapshot.midiChannel = midiChannel;
         snapshot.midiCc = firstMidiCc + slot;
-        snapshot.midiValue = snapshot.kind == hardware::Kind::Button
+        snapshot.midiValue = snapshot.kind == backend::Kind::Button
             ? (snapshot.normalizedValue >= 0.5f ? 127 : 0)
             : normalizedToMidiValue(snapshot.normalizedValue);
     }
@@ -619,7 +619,7 @@ void HardwareControlAudioProcessor::stopSerialThread() {
  */
 void HardwareControlAudioProcessor::serialThreadMain(SerialConfig config) {
     try {
-        hardware::SerialReader reader(config.device.toStdString(), config.baud);
+        backend::SerialReader reader(config.device.toStdString(), config.baud);
         connected_.store(true);
         pushSerialLogLine("Connected to " + config.device);
 
@@ -642,10 +642,10 @@ void HardwareControlAudioProcessor::serialThreadMain(SerialConfig config) {
                     line.pop_back();
                 }
 
-                const auto parsedLine = hardware::parseLine(line);
+                const auto parsedLine = backend::parseLine(line);
                 pushSerialLogLine(juce::String(parsedLine.text));
 
-                const auto frame = hardware::parseFrame(line);
+                const auto frame = backend::parseFrame(line);
                 if (!frame) {
                     continue;
                 }
@@ -744,16 +744,16 @@ void HardwareControlAudioProcessor::updateSessionMapping(int pin, int action) {
 /*
  * replace GUI-visible session mappings from the first complete serial frame.
  * PARAMS:
- *   ∟ const hardware::Frame& frame   : parsed serial data frame
+ *   ∟ const backend::Frame& frame   : parsed serial data frame
  * RETURNS: none
  */
-void HardwareControlAudioProcessor::replaceSessionMappingsFromFrame(const hardware::Frame& frame) {
+void HardwareControlAudioProcessor::replaceSessionMappingsFromFrame(const backend::Frame& frame) {
     const std::lock_guard<std::mutex> lock(sessionMappingsMutex_);
     std::vector<SessionMapping> nextMappings;
     nextMappings.reserve(frame.readings.size());
 
     for (const auto& reading : frame.readings) {
-        if (reading.pin < 0 || reading.slot < 0 || reading.slot >= hardware::maxInputSlots) {
+        if (reading.pin < 0 || reading.slot < 0 || reading.slot >= backend::maxInputSlots) {
             continue;
         }
 

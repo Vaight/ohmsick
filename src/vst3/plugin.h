@@ -154,7 +154,7 @@ public:
     struct InputSnapshot {
         bool active = false;
         int pin = -1;
-        hardware::Kind kind = hardware::Kind::Pot;
+        backend::Kind kind = backend::Kind::Pot;
         float normalizedValue = 0.0f;
         int midiChannel = 1;
         int midiCc = 1;
@@ -167,7 +167,7 @@ public:
      * RETURNS:
      *   ∟ std::array<InputSnapshot, maxInputSlots>   : slot snapshots
      */
-    std::array<InputSnapshot, hardware::maxInputSlots> getInputSnapshots() const;
+    std::array<InputSnapshot, backend::maxInputSlots> getInputSnapshots() const;
 
     /*
      * assignment accepted during the current processor session.
@@ -219,7 +219,7 @@ private:
      * add, replace, remove, or clear mappings in the current in-memory session.
      */
     void updateSessionMapping(int pin, int action);
-    void replaceSessionMappingsFromFrame(const hardware::Frame& frame);
+    void replaceSessionMappingsFromFrame(const backend::Frame& frame);
     void clearSessionMappings();
 
     /*
@@ -258,13 +258,13 @@ private:
      * backend-owned input state written by the serial thread and read by the
      * GUI/audio threads.
      */
-    hardware::DataProcessor dataProcessor_;
+    backend::DataProcessor dataProcessor_;
 
     /*
      * per-slot MIDI history used to suppress duplicate controller events.
      */
-    std::array<std::atomic<int>, hardware::maxInputSlots> lastSentCcValues_ {};
-    std::array<std::atomic<bool>, hardware::maxInputSlots> hasSentCcValues_ {};
+    std::array<std::atomic<int>, backend::maxInputSlots> lastSentCcValues_ {};
+    std::array<std::atomic<bool>, backend::maxInputSlots> hasSentCcValues_ {};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(HardwareControlAudioProcessor)
 };

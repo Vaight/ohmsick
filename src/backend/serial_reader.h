@@ -10,7 +10,7 @@
 
 #include "backend/serial_port.h"
 
-namespace hardware {
+namespace backend {
 
 class SerialReader {
 public:
@@ -36,4 +36,4 @@ private:
     NativeSerialHandle handle_ = invalidSerialHandle;
 };
 
-}  // namespace hardware
+}  // namespace backend
