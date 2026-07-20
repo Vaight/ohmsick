@@ -2,16 +2,7 @@ name: Build Artifacts
 
 on:
   workflow_dispatch:
-  pull_request:
-    branches:
-      - main
-      - "release/**"
-      - "version/**"
   push:
-    branches:
-      - main
-      - "release/**"
-      - "version/**"
     tags:
       - "v*.*.*"
 
