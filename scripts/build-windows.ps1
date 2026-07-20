@@ -31,7 +31,7 @@ if (-not [string]::IsNullOrWhiteSpace($Architecture)) {
 
 cmake @configureArgs
 
-$buildArgs = @("--build", $BuildDir, "--config", $Config)
+$buildArgs = @("--build", $BuildDir, "--config", $Config, "--parallel")
 if (-not [string]::IsNullOrWhiteSpace($Target)) {
     $buildArgs += @("--target", $Target)
 }
