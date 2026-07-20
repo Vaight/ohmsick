@@ -14,7 +14,7 @@ This project contains 3 distinct systems. The 1st is the <b><i>firmware</i></b>,
 
 # Installation & Build
 
-This software is in an experimental (EXP) state. This means that there is not an official build of the software to download. Follow the following steps to build it yourself!
+You can either download the compuled VST3 from a given release tag or build it with the instructions below.
 <br><br>
 
 First, clone the repository onto your machine.
