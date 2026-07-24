@@ -2,9 +2,10 @@
 
 - <i>v0.2.2</i> : <b>On-The-Fly Data Modification</b>
     - <s>Change I/O ownership to the backend instead of the plugin.</s>
-    - Inversion (Map range `0-127` to `127-0` and vice versa).
+    - <s>Inversion (Map range `0-127` to `127-0` and vice versa).</s>
     - Arbutrary Remap (Map range `0-127` to `A-B` where `0 < A,B < 127` and `A < B`).
-    - Data Toggle (Toggle between `0` and `127` from a digital input; button to switch).
+    - <s>Data Toggle (Toggle between `0` and `127` from a digital input; button to switch).</s>
+    - <s>Data interpolation between digital input values.</s>
     - Apply these algorithms to each GUI card config.
     - Card GUI line chart representation of processed data.
     - Attempt to lower serial & processing latency.

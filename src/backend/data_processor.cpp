@@ -31,6 +31,18 @@ namespace {
         return slot >= 0 && slot < backend::maxInputSlots;
     }
 
+    /**
+     * @brief Inverts a normalized value's mapping.
+     *   This method inverts a normalized float from the 0.0f - 1.0f range to the
+     *   1.0f - 0.0f range. Used by the inversion modifiers.
+     *
+     * @param value  The float value to invert.
+     * @return float The inverted float.
+     */
+    float normalizedInvert(float value) {
+        return 1.0f - clamp01(value);
+    }
+
 }  // namespace
 
 namespace backend {
@@ -41,9 +53,12 @@ namespace backend {
      *   This is the constructor definition for a DataProcessor object.
      *   Here we set all initial values and run an initial reset.
      *
-     * @param smoothingAlpha The amoount of smoothing on analog inputs.
+     * @param smoothingAlpha     The amoount of smoothing on analog inputs.
+     * @param interpolationDelta The amount moved per frame by digital interpolation.
      */
-    DataProcessor::DataProcessor(float smoothingAlpha) : smoothingAlpha_(clamp01(smoothingAlpha)) {
+    DataProcessor::DataProcessor(float smoothingAlpha, float interpolationDelta)
+        : smoothingAlpha_(clamp01(smoothingAlpha)),
+          interpolationDelta_(clamp01(interpolationDelta)) {
         reset();
     }
 
@@ -54,11 +69,16 @@ namespace backend {
      */
     void DataProcessor::reset() {
         smoothedValues_.fill(0.0f);
+        interpolatedValues_.fill(0.0f);
+        previousDigitalValues_.fill(false);
+        toggledValues_.fill(false);
+        appliedModifiers_.fill(Modifier::None);
         for (int slot = 0; slot < maxInputSlots; ++slot) {
             const auto index = static_cast<std::size_t>(slot);
             values_[index].store(0.0f);
             pins_[index].store(-1);
             kinds_[index].store(static_cast<int>(Kind::Pot));
+            modifiers_[index].store(static_cast<int>(Modifier::None));
             active_[index].store(false);
         }
     }
@@ -67,6 +87,7 @@ namespace backend {
      * @brief Processes and publishes the latest serial readings to the property arrays.
      *   This method is the backbone of the DataProcessor. It takes in a frame reference to read from
      *   and it applies the frame readings to the corresponding property array for the slot indexes.
+     *   This method now handles modifier application!
      *   (Member of the DataProcessor class)
      *
      * @param frame The serial frame reference
@@ -79,21 +100,80 @@ namespace backend {
             if (!isValidSlot(reading.slot)) continue;
 
             // get the slot and value constants from the current reading frame.
-            const auto slot   = static_cast<std::size_t>(reading.slot);
-            const float value = clamp01(reading.normalizedValue);
+            const auto slot          = static_cast<std::size_t>(reading.slot);
+            const float value        = clamp01(reading.normalizedValue);
+            const auto modifier      = static_cast<Modifier>(modifiers_[slot].load());
+            const bool isDigital     = value >= 0.5f;
+            const float digitalValue = isDigital ? 1.0f : 0.0f;
 
-            // uses the existing Kind system to apply smoothing for analog inputs.
-            if (reading.kind == Kind::Pot) smoothedValues_[slot] += smoothingAlpha_ * (value - smoothedValues_[slot]);
-            // if input is not analog, directly apply value.
-            else smoothedValues_[slot] = value;
+            if (appliedModifiers_[slot] != modifier) {
+                smoothedValues_[slot]        = values_[slot].load();
+                interpolatedValues_[slot].   = values_[slot].load();
+                previousDigitalValues_[slot] = false;
+                toggledValues_[slot]         = false;
+                appliedModifiers_[slot]      = modifier;
+            }
+
+            float modifiedValue = value;
+
+            // apply modifiers
+            switch (modifier) {
+                case Modifier::DigitalInvert:
+                    modifiedValue = normalizedInvert(digitalValue);
+                    break;
+                case Modifier::DigitalToggle:
+                    if (isDigital && !previousDigitalValues_[slot]) {
+                        toggledValues_[slot] = !toggledValues_[slot];
+                    }
+                    modifiedValue = toggledValues_[slot] ? 1.0f : 0.0f;
+                    break;
+                case Modifier::DigitalLerp:
+                    if (interpolatedValues_[slot] < digitalValue) {
+                        interpolatedValues_[slot] =
+                            std::min(digitalValue, interpolatedValues_[slot] + interpolationDelta_);
+                    } else if (interpolatedValues_[slot] > digitalValue) {
+                        interpolatedValues_[slot] =
+                            std::max(digitalValue, interpolatedValues_[slot] - interpolationDelta_);
+                    }
+                    modifiedValue = interpolatedValues_[slot];
+                    break;
+                case Modifier::AnalogInvert:
+                    modifiedValue = normalizedInvert(value);
+                    break;
+                case Modifier::AnalogSmooth:
+                    smoothedValues_[slot] +=
+                        smoothingAlpha_ * (value - smoothedValues_[slot]);
+                    modifiedValue = smoothedValues_[slot];
+                    break;
+                case Modifier::None:
+                default:
+                    // unknown modifier, do nothing.
+                    break;
+            }
+            previousDigitalValues_[slot] = isDigital;
 
             // apply the properties.
-            values_[slot].store(smoothedValues_[slot]);
+            values_[slot].store(clamp01(modifiedValue));
             pins_[slot].store(reading.pin);
             kinds_[slot].store(static_cast<int>(reading.kind));
             active_[slot].store(true);
 
         }
+    }
+
+    /**
+     * @brief Assigns the modifier used when processing future frames for a slot.
+     *
+     * @param slot     The mapped slot to configure.
+     * @param modifier The modifier to apply.
+     * @return true    The slot was valid and its modifier was assigned.
+     * @return false   The slot was invalid.
+     */
+    bool DataProcessor::setInputModifier(int slot, Modifier modifier) {
+        if (!isValidSlot(slot)) return false;
+
+        modifiers_[static_cast<std::size_t>(slot)].store(static_cast<int>(modifier));
+        return true;
     }
 
     /**
@@ -107,15 +187,14 @@ namespace backend {
      * @return InputValue The current slot state.
      */
     InputValue DataProcessor::getInputBySlot(int slot) const {
-        if (!isValidSlot(slot)) {
-            return {};
-        }
+        if (!isValidSlot(slot)) return {};
 
         const auto index = static_cast<std::size_t>(slot);
         InputValue input;
-        input.active = active_[index].load();
-        input.pin = pins_[index].load();
-        input.kind = static_cast<Kind>(kinds_[index].load());
+        input.active          = active_[index].load();
+        input.pin             = pins_[index].load();
+        input.kind            = static_cast<Kind>(kinds_[index].load());
+        input.modifier        = static_cast<Modifier>(modifiers_[index].load());
         input.normalizedValue = clamp01(values_[index].load());
         return input;
     }
