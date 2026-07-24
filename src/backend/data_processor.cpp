@@ -1,3 +1,5 @@
+// re-documented on 7-24-2026
+
 #include "backend/data_processor.h"
 
 #include <algorithm>
@@ -5,12 +7,11 @@
 
 namespace {
 
-    /*
-     * METHOD clamp01      : clamps a float between 0.0f and 1.0f
-     * PARAMS:
-     *   ∟ float value     : value to clamp between 0.0f and 1.0f
-     * RETURNS:
-     *   ∟ float value     : the final clamped value, between 0.0f and 1.0f
+    /**
+     * @brief Clamps a float between 0.0f and 1.0f.
+     * 
+     * @param value  The value to clamp.
+     * @return float The clamped value.
      */
     float clamp01(float value) {
         if (value < 0.0f) return 0.0f;
@@ -18,12 +19,13 @@ namespace {
         return value;
     }
 
-    /*
-     * METHOD isValidSlot    : checks if a slot is within the range of possible slots
-     * PARAMS:
-     *   ∟ int slot          : the slot index to test
-     * RETURNS:
-     *   ∟ bool valid        : t/f if the slot is within max slots
+    /**
+     * @brief Checker for if a slot is valid.
+     *   This method simply checks if a slot is within the max slot boundary.
+     * 
+     * @param slot   The slot to check.
+     * @return true  The slot is valid.
+     * @return false The slot is invalid.
      */
     bool isValidSlot(int slot) {
         return slot >= 0 && slot < backend::maxInputSlots;
@@ -33,24 +35,25 @@ namespace {
 
 namespace backend {
 
-    /*
-     * CONSTRUCTOR DataProcessor            : prepares a processor for normalized hardware input values.
-     * PARAMS:
-     *   ∟ float smoothingAlpha             : 0.0f-1.0f smoothing amount used for pot readings
-     * RETURNS: none
+    /**
+     * @brief DataProcessor Constructor.
+     *
+     *   This is the constructor definition for a DataProcessor object.
+     *   Here we set all initial values and run an initial reset.
+     *
+     * @param smoothingAlpha The amoount of smoothing on analog inputs.
      */
     DataProcessor::DataProcessor(float smoothingAlpha) : smoothingAlpha_(clamp01(smoothingAlpha)) {
         reset();
     }
 
-    /*
-     * METHOD DataProcessor::reset          : clears all input slots back to inactive defaults.
-     * PARAMS: none
-     * RETURNS: none
+    /**
+     * @brief Resets the property value arrays of the processor.
+     *   This method overwrites the existing data with zeros or otherwise empty handled values.
+     *   (Member of the DataProcessor class)
      */
     void DataProcessor::reset() {
         smoothedValues_.fill(0.0f);
-
         for (int slot = 0; slot < maxInputSlots; ++slot) {
             const auto index = static_cast<std::size_t>(slot);
             values_[index].store(0.0f);
@@ -60,40 +63,48 @@ namespace backend {
         }
     }
 
-    /*
-     * METHOD DataProcessor::applyFrame     : publishes the latest parsed serial input readings.
-     * PARAMS:
-     *   ∟ const Frame& frame               : parsed hardware frame containing slot/pin/value readings
-     * RETURNS: none
+    /**
+     * @brief Processes and publishes the latest serial readings to the property arrays.
+     *   This method is the backbone of the DataProcessor. It takes in a frame reference to read from
+     *   and it applies the frame readings to the corresponding property array for the slot indexes.
+     *   (Member of the DataProcessor class)
+     *
+     * @param frame The serial frame reference
      */
     void DataProcessor::applyFrame(const Frame& frame) {
+        // for each reading frame.
         for (const auto& reading : frame.readings) {
-            if (!isValidSlot(reading.slot)) {
-                continue;
-            }
 
-            const auto slot = static_cast<std::size_t>(reading.slot);
+            // if the slot is valid, continue processing.
+            if (!isValidSlot(reading.slot)) continue;
+
+            // get the slot and value constants from the current reading frame.
+            const auto slot   = static_cast<std::size_t>(reading.slot);
             const float value = clamp01(reading.normalizedValue);
 
-            if (reading.kind == Kind::Pot) {
-                smoothedValues_[slot] += smoothingAlpha_ * (value - smoothedValues_[slot]);
-            } else {
-                smoothedValues_[slot] = value;
-            }
+            // uses the existing Kind system to apply smoothing for analog inputs.
+            if (reading.kind == Kind::Pot) smoothedValues_[slot] += smoothingAlpha_ * (value - smoothedValues_[slot]);
+            // if input is not analog, directly apply value.
+            else smoothedValues_[slot] = value;
 
+            // apply the properties.
             values_[slot].store(smoothedValues_[slot]);
             pins_[slot].store(reading.pin);
             kinds_[slot].store(static_cast<int>(reading.kind));
             active_[slot].store(true);
+
         }
     }
 
-    /*
-     * METHOD DataProcessor::getInputBySlot : gets the current value for a slot index.
-     * PARAMS:
-     *   ∟ int slot                         : hardware slot index to read
-     * RETURNS:
-     *   ∟ InputValue input                 : current slot state, or inactive defaults for invalid slots
+    /**
+     * @brief Getter for an InputValue object from a mapped slot.
+     *   This method builds a new InputValue object based on the properties of the provided
+     *   slot index. The slot index is checked for each property array and is assigned to
+     *   its corresponding property within the InputValue object.
+     *   (Member of the DataProcessor class)
+     *
+     * @param slot        The mapped slot (index) to read properties from.
+     * @return InputValue The current slot state.
      */
     InputValue DataProcessor::getInputBySlot(int slot) const {
         if (!isValidSlot(slot)) {
@@ -109,12 +120,14 @@ namespace backend {
         return input;
     }
 
-    /*
-     * METHOD DataProcessor::getInputByPin  : finds the current value for a physical pin.
-     * PARAMS:
-     *   ∟ int pin                          : physical pin number to search for
-     * RETURNS:
-     *   ∟ optional<InputValue> input       : matching active input, or nullopt if the pin is inactive
+    /**
+     * @brief Getter for an InputValue object based on an assigned input pin
+     *   This method searches all assigned InputValue objects for an active
+     *   object with the requested 'pin' property.
+     *   (Member of the DataProcessor class)
+     *
+     * @param pin                        The physical pin number to search for.
+     * @return std::optional<InputValue> The matching InputValue object, can also be nullopt (not found).
      */
     std::optional<InputValue> DataProcessor::getInputByPin(int pin) const {
         for (int slot = 0; slot < maxInputSlots; ++slot) {
@@ -127,63 +140,84 @@ namespace backend {
         return std::nullopt;
     }
 
-    /*
-     * METHOD DataProcessor::getInputs      : copies all published input slot states.
-     * PARAMS: none
-     * RETURNS:
-     *   ∟ array<InputValue> inputs         : point-in-time snapshot of every input slot
+    /**
+     * @brief Getter for an array of all mapped input slots.
+     *   This method returns an std array of all mapped input slots.
+     *   (Member of the DataProcessor class)
+     *
+     * @return std::array<InputValue, maxInputSlots> The array
      */
     std::array<InputValue, maxInputSlots> DataProcessor::getInputs() const {
         std::array<InputValue, maxInputSlots> inputs {};
         for (int slot = 0; slot < maxInputSlots; ++slot) {
             inputs[static_cast<std::size_t>(slot)] = getInputBySlot(slot);
         }
-
         return inputs;
     }
-
-    /*
-     * METHOD DataProcessor::hasInputValue  : checks whether a slot has received data.
-     * PARAMS:
-     *   ∟ int slot                         : hardware slot index to test
-     * RETURNS:
-     *   ∟ bool active                      : true when the slot currently has a published value
+    
+    /**
+     * @brief Checker for a slot to see if it has recieved data.
+     *   This method executes the getInputBySlot method, which returns an InputValue object.
+     *   The InputValue object has a property 'active' which is returned here.
+     *   (Member of the DataProcessor class)
+     *
+     * @param slot   The mapped slot to get the input value from.
+     * @return true  The slot recieved data.
+     * @return false The slot is idle / hasn't recieved data.
      */
     bool DataProcessor::hasInputValue(int slot) const {
         return getInputBySlot(slot).active;
     }
 
-    /*
-     * METHOD DataProcessor::getInputValue  : gets the normalized value for a slot.
-     * PARAMS:
-     *   ∟ int slot                         : hardware slot index to read
-     * RETURNS:
-     *   ∟ float value                      : current normalized value from 0.0f to 1.0f
+    /**
+     * @brief Getter for the normalized input value of a mapped slot.
+     *   This method executes the getInputBySlot method, which returns an InputValue object.
+     *   The InputValue object has a property 'normalizedValue' which is returned here.
+     *   (Member of the DataProcessor class)
+     *
+     * @param slot   The mapped slot to get the input value from.
+     * @return float The normalized result of the recieved input value.
      */
     float DataProcessor::getInputValue(int slot) const {
         return getInputBySlot(slot).normalizedValue;
     }
-
-    /*
-     * METHOD DataProcessor::getInputValueAsCC  : gets a slot value mapped to MIDI CC range.
-     * PARAMS:
-     *   ∟ int slot                             : hardware slot index to read
-     * RETURNS:
-     *   ∟ int value                            : current slot value mapped from 0 to 127
+    
+    /**
+     * @brief Getter for a mapped slot's value that's been converted to the MIDI CC range.
+     *   This method executes the getInputValue method for a slot and uses the normalizedToCc
+     *   method to convert the normalized value float into the integer range for MIDI CC.
+     *   (Member of the DataProcessor class)
+     *
+     * @param slot The hardware slot to read from.
+     * @return int The converted MIDI CC integer from the slot value.
      */
     int DataProcessor::getInputValueAsCC(int slot) const {
         return normalizedToCc(getInputValue(slot));
     }
 
-    /*
-     * METHOD normalizedToCc                : maps a normalized float to the MIDI CC value range.
-     * PARAMS:
-     *   ∟ float value                      : normalized value to clamp and map
-     * RETURNS:
-     *   ∟ int value                        : integer value between 0 and 127
+    /**
+     * @brief Convert normalized float into a MIDI CC integer.
+     *   This method clamps and casts a provided 0.0f - 1.0f float and converts it to
+     *   a range 0 - 127 integer value by static casting & rounding the float. MIDI CC
+     *   is exclusively operated within this integer range.
+     *
+     * @param value The float value to remap to the MIDI CC integer range.
+     * @return int  The resulting MIDI CC integer.
      */
     int normalizedToCc(float value) {
         return std::clamp(static_cast<int>(std::lround(clamp01(value) * 127.0f)), 0, 127);
+    }
+
+    /**
+    * @brief Convert normalized float into integer.
+    *   This method clamps and casts a provided 0.0f - 1.0f float and converts it to
+    *   either a 0 or 1 integer value by static casting & rounding the float.
+    *
+    * @param value The float value to convert.
+    * @return int  The resulting integer, 0 or 1.
+    */
+    int normalizedToInt(float value) {
+        return std::clamp(static_cast<int>(std::lround(clamp01(value))), 0, 1);
     }
 
 }  // namespace backend

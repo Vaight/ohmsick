@@ -1,3 +1,5 @@
+// re-documented on 7-24-2026
+
 #pragma once
 
 #include "backend/protocol.h"
@@ -10,6 +12,12 @@ namespace backend {
 
 constexpr float defaultInputSmoothingAlpha = 0.25f;
 
+/**
+ * @struct InputValue
+ * @brief The state of a mapped input.
+ *   This struct is a definition for the input state properties of a slot.
+ *   This is used across DataProcessor to access slot state properties.
+ */
 struct InputValue {
     bool active = false;
     int pin = -1;
